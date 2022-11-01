@@ -11,7 +11,8 @@
 using namespace chai3d;
 using namespace std;
 //------------------------------------------------------------------------------
-#include "GL/glut.h"
+#include <GLFW/glfw3.h>
+//#include "GL/glut.h"
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp> //for matrices
@@ -87,13 +88,25 @@ cFrequencyCounter freqCounterHaptics;
 // haptic thread
 cThread* hapticsThread;
 
+// a handle to window display context
+GLFWwindow* window = NULL;
+
+// current width of window
+int width = 0;
+
+// current height of window
+int height = 0;
+
+// swap interval for the display context (vertical synchronization)
+int swapInterval = 1;
+
 // information about computer screen and GLUT display window
-int screenW;
-int screenH;
-int windowW;
-int windowH;
-int windowPosX;
-int windowPosY;
+//int screenW;
+//int screenH;
+//int windowW;
+//int windowH;
+//int windowPosX;
+//int windowPosY;
 
 //---------------------------------------------------------------------------
 // GEL
@@ -258,6 +271,15 @@ void applyProvotDynamicInverse();
 // callback when idle
 void onIdle();
 
+void errorCallback(int error, const char* a_description);
+
+void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, int a_mods);
+
+void windowSizeCallback(GLFWwindow* a_window, int a_width, int a_height);
+
+void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a_mods);
+
+
 //==============================================================================
 /*
     TEMPLATE: main.cpp
@@ -287,50 +309,76 @@ int main(int argc, char* argv[])
     // OPENGL - WINDOW DISPLAY
     //--------------------------------------------------------------------------
 
-    // initialize GLUT
-    glutInit(&argc, argv);
-
-    // retrieve  resolution of computer display and position window accordingly
-    screenW = glutGet(GLUT_SCREEN_WIDTH);
-    screenH = glutGet(GLUT_SCREEN_HEIGHT);
-    windowW = (int)(0.8 * screenH);
-    windowH = (int)(0.5 * screenH);
-    windowPosY = (screenH - windowH) / 2;
-    windowPosX = windowPosY;
-
-    // initialize the OpenGL GLUT window
-    glutInitWindowPosition(windowPosX, windowPosY);
-    glutInitWindowSize(windowW, windowH);
-
-    if (stereoMode == C_STEREO_ACTIVE)
-        glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE | GLUT_STEREO);
-    else
-        glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
-
-    // create display context and initialize GLEW library
-    glutCreateWindow("Cloth Demo [Explicit Euler Integration]");
-
-#ifdef GLEW_VERSION
-    // initialize GLEW
-    glewInit();
-#endif
-
-    // setup GLUT options
-    glutDisplayFunc(updateGraphics);
-    glutReshapeFunc(resizeWindow);
-    glutIdleFunc(onIdle);
-
-    glutMouseFunc(onMouseDown);
-    glutMotionFunc(onMouseMove);
-    glutKeyboardFunc(keySelect);
-    glutSetWindowTitle("Deformable Objects");
-
-    // set fullscreen mode
-    if (fullscreen)
+    // initialize GLFW library
+    if (!glfwInit())
     {
-        glutFullScreen();
+        cout << "failed initialization" << endl;
+        cSleepMs(1000);
+        return 1;
     }
 
+    // set error callback
+    glfwSetErrorCallback(errorCallback);
+
+    // compute desired size of window
+    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    int w = 0.8 * mode->height;
+    int h = 0.5 * mode->height;
+    int x = 0.5 * (mode->width - w);
+    int y = 0.5 * (mode->height - h);
+
+    // set OpenGL version
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+
+    // set active stereo mode
+    if (stereoMode == C_STEREO_ACTIVE)
+    {
+        glfwWindowHint(GLFW_STEREO, GL_TRUE);
+    }
+    else
+    {
+        glfwWindowHint(GLFW_STEREO, GL_FALSE);
+    }
+
+    // create display context
+    window = glfwCreateWindow(w, h, "CHAI3D", NULL, NULL);
+    if (!window)
+    {
+        cout << "failed to create window" << endl;
+        cSleepMs(1000);
+        glfwTerminate();
+        return 1;
+    }
+
+
+    // get width and height of window
+    glfwGetWindowSize(window, &width, &height);
+
+    // set position of window
+    glfwSetWindowPos(window, x, y);
+
+    // set key callback
+    glfwSetKeyCallback(window, keyCallback);
+
+    // set resize callback
+    glfwSetWindowSizeCallback(window, windowSizeCallback);
+
+    // set current display context
+    glfwMakeContextCurrent(window);
+
+    // sets the swap interval for the current display context
+    glfwSwapInterval(swapInterval);
+
+    // initialize GLEW library
+#ifdef GLEW_VERSION
+    if (glewInit() != GLEW_OK)
+    {
+        cout << "failed to initialize GLEW library" << endl;
+        glfwTerminate();
+        return 1;
+    }
+#endif
 
     //--------------------------------------------------------------------------
     // WORLD - CAMERA - LIGHTING
@@ -436,7 +484,7 @@ int main(int argc, char* argv[])
     deviceForceScale = 5.0;
 
     // create a large sphere that represents the haptic device
-    deviceRadius = 0.2;
+    deviceRadius = 0.1;
     device = new cShapeSphere(deviceRadius);
     world->addChild(device);
     device->m_material->setWhite();
@@ -457,51 +505,11 @@ int main(int argc, char* argv[])
     defObject = new cGELMesh();
     defWorld->m_gelMeshes.push_front(defObject);
 
-    // load model
-    /*bool fileload;
-    fileload = defObject->loadFromFile(RESOURCE_PATH("../resources/models/box/box.obj"));
-    if (!fileload)
-    {
-#if defined(_MSVC)
-        fileload = defObject->loadFromFile("../../../bin/resources/models/box/box.obj");
-#endif
-    }
-    if (!fileload)
-    {
-        cout << "Error - 3D Model failed to load correctly." << endl;
-        close();
-        return (-1);
-    }*/
-
     // set some material color on the object
     cMaterial mat;
     mat.setWhite();
     mat.setShininess(100);
     defObject->setMaterial(mat, true);
-
-    // let's create a some environment mapping
-//    shared_ptr<cTexture2d> texture(new cTexture2d());
-//    fileload = texture->loadFromFile(RESOURCE_PATH("../resources/images/shadow.jpg"));
-//    if (!fileload)
-//    {
-//#if defined(_MSVC)
-//        fileload = texture->loadFromFile("../../../bin/resources/images/shadow.jpg");
-//#endif
-//    }
-//    if (!fileload)
-//    {
-//        cout << "Error - Texture failed to load correctly." << endl;
-//        close();
-//        return (-1);
-//    }
-//
-//    // enable environmental texturing
-//    texture->setEnvironmentMode(GL_DECAL);
-//    texture->setSphericalMappingEnabled(true);
-
-    // assign and enable texturing
-    //defObject->setTexture(texture, true);
-    //defObject->setUseTexture(true, true);
 
     // set object to be transparent
     defObject->setTransparencyLevel(0.65, true, true);
@@ -594,57 +602,118 @@ int main(int argc, char* argv[])
     atexit(close);
 
     // start the main graphics rendering loop
-    glutTimerFunc(50, graphicsTimer, 0);
-    glutMainLoop();
+    windowSizeCallback(window, width, height);
+
+    // main graphic loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // get width and height of window
+        glfwGetWindowSize(window, &width, &height);
+
+        // render graphics
+        updateGraphics();
+
+        // swap buffers
+        glfwSwapBuffers(window);
+
+        // process events
+        glfwPollEvents();
+
+        // signal frequency counter
+        freqCounterGraphics.signal(1);
+    }
+
+    // close window
+    glfwDestroyWindow(window);
+
+    // terminate GLFW library
+    glfwTerminate();
 
     // exit
     return (0);
 }
 
-//------------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 
-void resizeWindow(int w, int h)
+void windowSizeCallback(GLFWwindow* a_window, int a_width, int a_height)
 {
-    windowW = w;
-    windowH = h;
+    // update window size
+    width = a_width;
+    height = a_height;
 }
 
 //------------------------------------------------------------------------------
 
-void keySelect(unsigned char key, int x, int y)
+void errorCallback(int a_error, const char* a_description)
 {
-    // option ESC: exit
-    if ((key == 27) || (key == 'q'))
+    cout << "Error: " << a_description << endl;
+}
+
+//------------------------------------------------------------------------------
+
+void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, int a_mods)
+{
+    // filter calls that only include a key press
+    if ((a_action != GLFW_PRESS) && (a_action != GLFW_REPEAT))
     {
-        close();
-        exit(0);
+        return;
     }
 
-    // option f: toggle fullscreen
-    if (key == 'f')
+    // option - exit
+    else if ((a_key == GLFW_KEY_ESCAPE) || (a_key == GLFW_KEY_Q))
     {
+        glfwSetWindowShouldClose(a_window, GLFW_TRUE);
+    }
+
+    // option - show/hide skeleton
+    else if (a_key == GLFW_KEY_S)
+    {
+        defObject->m_showSkeletonModel = !defObject->m_showSkeletonModel;
+    }
+
+    // option - toggle fullscreen
+    else if (a_key == GLFW_KEY_F)
+    {
+        // toggle state variable
+        fullscreen = !fullscreen;
+
+        // get handle to monitor
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+
+        // get information about monitor
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+        // set fullscreen or window mode
         if (fullscreen)
         {
-            windowPosX = glutGet(GLUT_INIT_WINDOW_X);
-            windowPosY = glutGet(GLUT_INIT_WINDOW_Y);
-            windowW = glutGet(GLUT_INIT_WINDOW_WIDTH);
-            windowH = glutGet(GLUT_INIT_WINDOW_HEIGHT);
-            glutPositionWindow(windowPosX, windowPosY);
-            glutReshapeWindow(windowW, windowH);
-            fullscreen = false;
+            glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+            glfwSwapInterval(swapInterval);
         }
         else
         {
-            glutFullScreen();
-            fullscreen = true;
+            int w = 0.8 * mode->height;
+            int h = 0.5 * mode->height;
+            int x = 0.5 * (mode->width - w);
+            int y = 0.5 * (mode->height - h);
+            glfwSetWindowMonitor(window, NULL, x, y, w, h, mode->refreshRate);
+            glfwSwapInterval(swapInterval);
         }
     }
 
-    // option m: toggle display of points
-    if (key == 'm')
+    // option - toggle vertical mirroring
+    else if (a_key == GLFW_KEY_M)
+    {
+        mirroredDisplay = !mirroredDisplay;
+        camera->setMirrorVertical(mirroredDisplay);
+    }
+    else if (a_key == GLFW_KEY_P)
     {
         bDrawPoints = !bDrawPoints;
-        glutPostRedisplay();
+    }
+    else if (a_key == GLFW_KEY_Q || a_key == GLFW_KEY_ESCAPE)
+    {
+        close();
+        exit(0);
     }
 }
 
@@ -677,15 +746,15 @@ void close(void)
 
 //------------------------------------------------------------------------------
 
-void graphicsTimer(int data)
-{
-    if (simulationRunning)
-    {
-        glutPostRedisplay();
-    }
-
-    glutTimerFunc(50, graphicsTimer, 0);
-}
+//void graphicsTimer(int data)
+//{
+//    if (simulationRunning)
+//    {
+//        glutPostRedisplay();
+//    }
+//
+//    glutTimerFunc(50, graphicsTimer, 0);
+//}
 
 //------------------------------------------------------------------------------
 
@@ -699,8 +768,11 @@ void updateGraphics(void)
     labelHapticRate->setText(cStr(freqCounterGraphics.getFrequency(), 0) + " Hz");
 
     // update position of label
-    labelHapticRate->setLocalPos((int)(0.5 * (windowW - labelHapticRate->getWidth())), 15);
+    labelHapticRate->setLocalPos((int)(0.5 * (width - labelHapticRate->getWidth())), 15);
 
+
+    // update skins deformable objects
+    defWorld->updateSkins(true);
 
     /////////////////////////////////////////////////////////////////////
     // RENDER SCENE
@@ -710,13 +782,14 @@ void updateGraphics(void)
     world->updateShadowMaps(false, mirroredDisplay);
 
     // render world
-    camera->renderView(windowW, windowH);
+    camera->renderView(width, height);
 
     // render cloth
-    onRender();
+    //onRender();
+    drawGrid();
 
     // swap buffers
-    glutSwapBuffers();
+    //glutSwapBuffers();
 
     // wait until all GL commands are completed
     glFinish();
@@ -849,19 +922,22 @@ void updateHaptics(void)
 
 //------------------------------------------------------------------------------
 
-void onMouseDown(int button, int s, int x, int y)
+void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a_mods)
 {
-    if (s == GLUT_DOWN)
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+
+    if (a_button == GLFW_MOUSE_BUTTON_LEFT && a_action == GLFW_PRESS)
     {
         oldX = x;
         oldY = y;
-        int window_y = (windowH - y);
-        float norm_y = float(window_y) / float(windowH / 2.0);
+        int window_y = (height - y);
+        float norm_y = float(window_y) / float(height / 2.0);
         int window_x = x;
-        float norm_x = float(window_x) / float(windowW / 2.0);
-
+        float norm_x = float(window_x) / float(width / 2.0);
+        
         float winZ = 0;
-        glReadPixels(x, windowH - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+        glReadPixels(x, height - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
         if (winZ == 1)
             winZ = 0;
         double objX = 0, objY = 0, objZ = 0;
@@ -877,58 +953,97 @@ void onMouseDown(int button, int s, int x, int y)
         }
     }
 
-    if (button == GLUT_MIDDLE_BUTTON)
+    if (a_button == GLFW_MOUSE_BUTTON_MIDDLE)
         state = 0;
     else
         state = 1;
-
-    if (s == GLUT_UP) {
+        
+    if (a_action == GLFW_RELEASE) {
         selected_index = -1;
-        glutSetCursor(GLUT_CURSOR_INHERIT);
+        glfwSetCursorPos(window, x, y);
     }
 }
 
+//void onMouseDown(int button, int s, int x, int y)
+//{
+//    if (s == GLUT_DOWN)
+//    {
+//        oldX = x;
+//        oldY = y;
+//        int window_y = (windowH - y);
+//        float norm_y = float(window_y) / float(windowH / 2.0);
+//        int window_x = x;
+//        float norm_x = float(window_x) / float(windowW / 2.0);
+//
+//        float winZ = 0;
+//        glReadPixels(x, windowH - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+//        if (winZ == 1)
+//            winZ = 0;
+//        double objX = 0, objY = 0, objZ = 0;
+//        gluUnProject(window_x, window_y, winZ, MV, P, viewport, &objX, &objY, &objZ);
+//        glm::vec3 pt(objX, objY, objZ);
+//        size_t i = 0;
+//        for (i = 0; i < total_points; i++) {
+//            if (glm::distance(X[i], pt) < 0.1) {
+//                selected_index = i;
+//                printf("Intersected at %d\n", i);
+//                break;
+//            }
+//        }
+//    }
+//
+//    if (button == GLUT_MIDDLE_BUTTON)
+//        state = 0;
+//    else
+//        state = 1;
+//
+//    if (s == GLUT_UP) {
+//        selected_index = -1;
+//        glutSetCursor(GLUT_CURSOR_INHERIT);
+//    }
+//}
+
 //------------------------------------------------------------------------------
 
-void onMouseMove(int x, int y)
-{
-    if (selected_index == -1) {
-        if (state == 0)
-            dist *= (1 + (y - oldY) / 60.0f);
-        else
-        {
-            rY += (x - oldX) / 5.0f;
-            rX += (y - oldY) / 5.0f;
-        }
-    }
-    else {
-        float delta = 1500 / abs(dist);
-        float valX = (x - oldX) / delta;
-        float valY = (oldY - y) / delta;
-        if (abs(valX) > abs(valY))
-            glutSetCursor(GLUT_CURSOR_LEFT_RIGHT);
-        else
-            glutSetCursor(GLUT_CURSOR_UP_DOWN);
-        V[selected_index] = glm::vec3(0);
-        X[selected_index].x += Right[0] * valX;
-        float newValue = X[selected_index].y + Up[1] * valY;
-        if (newValue > 0)
-            X[selected_index].y = newValue;
-        X[selected_index].z += Right[2] * valX + Up[2] * valY;
-
-        //V[selected_index].x = 0;
-        //V[selected_index].y = 0;
-        //V[selected_index].z = 0;
-    }
-    oldX = x;
-    oldY = y;
-
-    glutPostRedisplay();
-}
+//void onMouseMove(int x, int y)
+//{
+//    if (selected_index == -1) {
+//        if (state == 0)
+//            dist *= (1 + (y - oldY) / 60.0f);
+//        else
+//        {
+//            rY += (x - oldX) / 5.0f;
+//            rX += (y - oldY) / 5.0f;
+//        }
+//    }
+//    else {
+//        float delta = 1500 / abs(dist);
+//        float valX = (x - oldX) / delta;
+//        float valY = (oldY - y) / delta;
+//        if (abs(valX) > abs(valY))
+//            glutSetCursor(GLUT_CURSOR_LEFT_RIGHT);
+//        else
+//            glutSetCursor(GLUT_CURSOR_UP_DOWN);
+//        V[selected_index] = glm::vec3(0);
+//        X[selected_index].x += Right[0] * valX;
+//        float newValue = X[selected_index].y + Up[1] * valY;
+//        if (newValue > 0)
+//            X[selected_index].y = newValue;
+//        X[selected_index].z += Right[2] * valX + Up[2] * valY;
+//
+//        //V[selected_index].x = 0;
+//        //V[selected_index].y = 0;
+//        //V[selected_index].z = 0;
+//    }
+//    oldX = x;
+//    oldY = y;
+//
+//    glutPostRedisplay();
+//}
 
 //------------------------------------------------------------------------------
 
-void onIdle() {
+/*void onIdle() {
     //Fixed time stepping + rendering at different fps
     if (accumulator >= timeStep)
     {
@@ -936,7 +1051,7 @@ void onIdle() {
         accumulator -= timeStep;
     }
     glutPostRedisplay();
-}
+}*/
 
 //------------------------------------------------------------------------------
 
@@ -1071,7 +1186,7 @@ void drawGrid()
 //------------------------------------------------------------------------------
 
 void initGL() {
-    startTime = (float)glutGet(GLUT_ELAPSED_TIME);
+    startTime = (float)glfwGetTime();
     currentTime = startTime;
 
     // get ticks per second
@@ -1162,73 +1277,73 @@ void initGL() {
     }
 }
 
-//------------------------------------------------------------------------------
-
-void onRender() {
-    size_t i = 0;
-    float newTime = (float)glutGet(GLUT_ELAPSED_TIME);
-    frameTime = newTime - currentTime;
-    currentTime = newTime;
-    //accumulator += frameTime;
-
-    //Using high res. counter
-    QueryPerformanceCounter(&t2);
-    // compute and print the elapsed time in millisec
-    frameTimeQP = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
-    t1 = t2;
-    accumulator += frameTimeQP;
-
-    ++totalFrames;
-    if ((newTime - startTime) > 1000)
-    {
-        float elapsedTime = (newTime - startTime);
-        fps = (totalFrames / elapsedTime) * 1000;
-        startTime = newTime;
-        totalFrames = 0;
-    }
-
-    sprintf_s(info, "FPS: %3.2f, Frame time (GLUT): %3.4f msecs, Frame time (QP): %3.3f", fps, frameTime, frameTimeQP);
-    glutSetWindowTitle(info);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    glTranslatef(0, 0, dist);
-    glRotatef(rX, 1, 0, 0);
-    glRotatef(rY, 0, 1, 0);
-
-    glGetDoublev(GL_MODELVIEW_MATRIX, MV);
-    viewDir.x = (float)-MV[2];
-    viewDir.y = (float)-MV[6];
-    viewDir.z = (float)-MV[10];
-    Right = glm::cross(viewDir, Up);
-
-    //draw grid
-    drawGrid();
-
-    //draw polygons
-    glColor3f(1, 1, 1);
-    glBegin(GL_TRIANGLES);
-    for (i = 0; i < indices.size(); i += 3) {
-        glm::vec3 p1 = X[indices[i]];
-        glm::vec3 p2 = X[indices[i + 1]];
-        glm::vec3 p3 = X[indices[i + 2]];
-        glVertex3f(p1.x, p1.y, p1.z);
-        glVertex3f(p2.x, p2.y, p2.z);
-        glVertex3f(p3.x, p3.y, p3.z);
-    }
-    glEnd();
-
-    //draw points
-    if (bDrawPoints) {
-        glBegin(GL_POINTS);
-        for (i = 0; i < total_points; i++) {
-            glm::vec3 p = X[i];
-            int is = (i == selected_index);
-            glColor3f((float)!is, (float)is, (float)is);
-            glVertex3f(p.x, p.y, p.z);
-        }
-        glEnd();
-    }
-}
+////------------------------------------------------------------------------------
+//
+//void onRender() {
+//    size_t i = 0;
+//    float newTime = (float)glutGet(GLUT_ELAPSED_TIME);
+//    frameTime = newTime - currentTime;
+//    currentTime = newTime;
+//    //accumulator += frameTime;
+//
+//    //Using high res. counter
+//    QueryPerformanceCounter(&t2);
+//    // compute and print the elapsed time in millisec
+//    frameTimeQP = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
+//    t1 = t2;
+//    accumulator += frameTimeQP;
+//
+//    ++totalFrames;
+//    if ((newTime - startTime) > 1000)
+//    {
+//        float elapsedTime = (newTime - startTime);
+//        fps = (totalFrames / elapsedTime) * 1000;
+//        startTime = newTime;
+//        totalFrames = 0;
+//    }
+//
+//    //sprintf_s(info, "FPS: %3.2f, Frame time (GLUT): %3.4f msecs, Frame time (QP): %3.3f", fps, frameTime, frameTimeQP);
+//    //glutSetWindowTitle(info);
+//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//    glLoadIdentity();
+//    glTranslatef(0, 0, dist);
+//    glRotatef(rX, 1, 0, 0);
+//    glRotatef(rY, 0, 1, 0);
+//
+//    glGetDoublev(GL_MODELVIEW_MATRIX, MV);
+//    viewDir.x = (float)-MV[2];
+//    viewDir.y = (float)-MV[6];
+//    viewDir.z = (float)-MV[10];
+//    Right = glm::cross(viewDir, Up);
+//
+//    //draw grid
+//    drawGrid();
+//
+//    //draw polygons
+//    glColor3f(1, 1, 1);
+//    glBegin(GL_TRIANGLES);
+//    for (i = 0; i < indices.size(); i += 3) {
+//        glm::vec3 p1 = X[indices[i]];
+//        glm::vec3 p2 = X[indices[i + 1]];
+//        glm::vec3 p3 = X[indices[i + 2]];
+//        glVertex3f(p1.x, p1.y, p1.z);
+//        glVertex3f(p2.x, p2.y, p2.z);
+//        glVertex3f(p3.x, p3.y, p3.z);
+//    }
+//    glEnd();
+//
+//    //draw points
+//    if (bDrawPoints) {
+//        glBegin(GL_POINTS);
+//        for (i = 0; i < total_points; i++) {
+//            glm::vec3 p = X[i];
+//            int is = (i == selected_index);
+//            glColor3f((float)!is, (float)is, (float)is);
+//            glVertex3f(p.x, p.y, p.z);
+//        }
+//        glEnd();
+//    }
+//}
 
 cVector3d computeForce(const cVector3d& a_cursor,
     double a_cursorRadius,
