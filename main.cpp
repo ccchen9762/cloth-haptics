@@ -6,12 +6,12 @@
 
 //------------------------------------------------------------------------------
 #include "chai3d.h"
+#include "GEL3D.h"
 //------------------------------------------------------------------------------
 using namespace chai3d;
 using namespace std;
 //------------------------------------------------------------------------------
 #include "GL/glut.h"
-#include "GEL3D.h"
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp> //for matrices
@@ -57,11 +57,20 @@ cHapticDeviceHandler* handler;
 // a pointer to the current haptic device
 cGenericHapticDevicePtr hapticDevice;
 
+// force scale factor
+double deviceForceScale;
+
+// scale factor between the device workspace and cursor workspace
+double workspaceScaleFactor;
+
+// desired workspace radius of the virtual cursor
+double cursorWorkspaceRadius;
+
 // a label to display the rate [Hz] at which the simulation is running
 cLabel* labelHapticRate;
 
 // a small sphere (cursor) representing the haptic device 
-cShapeSphere* cursor;
+//cShapeSphere* cursor;
 
 // flag to indicate if the haptic simulation currently running
 bool simulationRunning = false;
@@ -69,8 +78,11 @@ bool simulationRunning = false;
 // flag to indicate if the haptic simulation has terminated
 bool simulationFinished = false;
 
-// frequency counter to measure the simulation haptic rate
-cFrequencyCounter frequencyCounter;
+// a frequency counter to measure the simulation graphic rate
+cFrequencyCounter freqCounterGraphics;
+
+// a frequency counter to measure the simulation haptic rate
+cFrequencyCounter freqCounterHaptics;
 
 // haptic thread
 cThread* hapticsThread;
@@ -88,7 +100,7 @@ int windowPosY;
 //---------------------------------------------------------------------------
 
 // deformable world
-/*cGELWorld* defWorld;
+cGELWorld* defWorld;
 
 // object mesh
 cGELMesh* defObject;
@@ -104,7 +116,7 @@ double deviceRadius;
 double radius;
 
 // stiffness properties between the haptic device tool and the model (GEM)
-double stiffness;*/
+double stiffness;
 
 //------------------------------------------------------------------------------
 // DECLARED GRAPHICS VARIABLES
@@ -177,7 +189,7 @@ float fRadius = 1;
 
 // Resolve constraint in object space
 glm::vec3 center = glm::vec3(0, 0, 0); //object space center of ellipsoid
-float radius = 1;                    //object space radius of ellipsoid
+//float radius = 1;                    //object space radius of ellipsoid
 
 
 //------------------------------------------------------------------------------
@@ -193,15 +205,21 @@ void keySelect(unsigned char key, int x, int y);
 // callback to render graphic scene
 void updateGraphics(void);
 
+// main haptics simulation loop
+void updateHaptics(void);
+
 // callback of GLUT timer
 void graphicsTimer(int data);
 
 // function that closes the application
 void close(void);
 
-// main haptics simulation loop
-void updateHaptics(void);
-
+// compute forces between tool and environment
+cVector3d computeForce(const cVector3d& a_cursor,
+    double a_cursorRadius,
+    const cVector3d& a_spherePos,
+    double a_radius,
+    double a_stiffness);
 
 //------------------------------------------------------------------------------
 // DECLARED GRAPHICS FUNCTIONS
@@ -329,7 +347,7 @@ int main(int argc, char* argv[])
     world->addChild(camera);
 
     // position and orient the camera
-    camera->set(cVector3d(0.5, 0.0, 0.0),    // camera position (eye)
+    camera->set(cVector3d(1.5, 0.0, 1.0),    // camera position (eye)
         cVector3d(0.0, 0.0, 0.0),    // look at position (target)
         cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
 
@@ -346,6 +364,9 @@ int main(int argc, char* argv[])
     // set vertical mirrored display mode
     camera->setMirrorVertical(mirroredDisplay);
 
+    // enable multi-pass rendering to handle transparent objects
+    camera->setUseMultipassTransparency(true);
+
     // create a directional light source
     light = new cDirectionalLight(world);
 
@@ -359,10 +380,10 @@ int main(int argc, char* argv[])
     light->setDir(-1.0, 0.0, 0.0);
 
     // create a sphere (cursor) to represent the haptic device
-    cursor = new cShapeSphere(0.01);
+    //device = new cShapeSphere(0.1);
 
     // insert cursor inside world
-    world->addChild(cursor);
+    //world->addChild(device);
 
     // initialize scene
     initGL();
@@ -378,6 +399,9 @@ int main(int argc, char* argv[])
     // get a handle to the first haptic device
     handler->getDevice(hapticDevice, 0);
 
+    // retrieve information about the current haptic device
+    cHapticDeviceInfo hapticDeviceInfo = hapticDevice->getSpecifications();
+
     // open a connection to haptic device
     hapticDevice->open();
 
@@ -385,21 +409,165 @@ int main(int argc, char* argv[])
     hapticDevice->calibrate();
 
     // retrieve information about the current haptic device
-    cHapticDeviceInfo info = hapticDevice->getSpecifications();
+    //cHapticDeviceInfo info = hapticDevice->getSpecifications();
 
     // display a reference frame if haptic device supports orientations
-    if (info.m_sensedRotation == true)
+    if (hapticDeviceInfo.m_sensedRotation == true)
     {
         // display reference frame
-        cursor->setShowFrame(true);
+        device->setShowFrame(true);
 
         // set the size of the reference frame
-        cursor->setFrameSize(0.05);
+        device->setFrameSize(0.05);
     }
 
     // if the device has a gripper, enable the gripper to simulate a user switch
     hapticDevice->setEnableGripperUserSwitch(true);
 
+    // desired workspace radius of the cursor
+    cursorWorkspaceRadius = 0.2;
+
+    // read the scale factor between the physical workspace of the haptic
+    // device and the virtual workspace defined for the tool
+    workspaceScaleFactor = cursorWorkspaceRadius / hapticDeviceInfo.m_workspaceRadius;
+
+    // define a scale factor between the force perceived at the cursor and the
+    // forces actually sent to the haptic device
+    deviceForceScale = 5.0;
+
+    // create a large sphere that represents the haptic device
+    deviceRadius = 0.2;
+    device = new cShapeSphere(deviceRadius);
+    world->addChild(device);
+    device->m_material->setWhite();
+    device->m_material->setShininess(100);
+
+    // interaction stiffness between tool and deformable model 
+    stiffness = 100;
+
+    //-----------------------------------------------------------------------
+    // COMPOSE THE VIRTUAL SCENE
+    //-----------------------------------------------------------------------
+
+    // create a world which supports deformable object
+    defWorld = new cGELWorld();
+    world->addChild(defWorld);
+
+    // create a deformable mesh
+    defObject = new cGELMesh();
+    defWorld->m_gelMeshes.push_front(defObject);
+
+    // load model
+    /*bool fileload;
+    fileload = defObject->loadFromFile(RESOURCE_PATH("../resources/models/box/box.obj"));
+    if (!fileload)
+    {
+#if defined(_MSVC)
+        fileload = defObject->loadFromFile("../../../bin/resources/models/box/box.obj");
+#endif
+    }
+    if (!fileload)
+    {
+        cout << "Error - 3D Model failed to load correctly." << endl;
+        close();
+        return (-1);
+    }*/
+
+    // set some material color on the object
+    cMaterial mat;
+    mat.setWhite();
+    mat.setShininess(100);
+    defObject->setMaterial(mat, true);
+
+    // let's create a some environment mapping
+//    shared_ptr<cTexture2d> texture(new cTexture2d());
+//    fileload = texture->loadFromFile(RESOURCE_PATH("../resources/images/shadow.jpg"));
+//    if (!fileload)
+//    {
+//#if defined(_MSVC)
+//        fileload = texture->loadFromFile("../../../bin/resources/images/shadow.jpg");
+//#endif
+//    }
+//    if (!fileload)
+//    {
+//        cout << "Error - Texture failed to load correctly." << endl;
+//        close();
+//        return (-1);
+//    }
+//
+//    // enable environmental texturing
+//    texture->setEnvironmentMode(GL_DECAL);
+//    texture->setSphericalMappingEnabled(true);
+
+    // assign and enable texturing
+    //defObject->setTexture(texture, true);
+    //defObject->setUseTexture(true, true);
+
+    // set object to be transparent
+    defObject->setTransparencyLevel(0.65, true, true);
+
+    // build dynamic vertices
+    defObject->buildVertices();
+
+    // set default properties for skeleton nodes
+    cGELSkeletonNode::s_default_radius = 0.05;  // [m]
+    cGELSkeletonNode::s_default_kDampingPos = 2.5;
+    cGELSkeletonNode::s_default_kDampingRot = 0.6;
+    cGELSkeletonNode::s_default_mass = 0.002; // [kg]
+    cGELSkeletonNode::s_default_showFrame = true;
+    cGELSkeletonNode::s_default_color.setBlueCornflower();
+    cGELSkeletonNode::s_default_useGravity = true;
+    cGELSkeletonNode::s_default_gravity.set(0.00, 0.00, -9.81);
+    radius = cGELSkeletonNode::s_default_radius;
+
+    // use internal skeleton as deformable model
+    defObject->m_useSkeletonModel = true;
+
+    // create an array of nodes
+    for (int y = 0; y < 10; y++)
+    {
+        for (int x = 0; x < 10; x++)
+        {
+            cGELSkeletonNode* newNode = new cGELSkeletonNode();
+            nodes[x][y] = newNode;
+            defObject->m_nodes.push_front(newNode);
+            newNode->m_pos.set((-0.45 + 0.1 * (double)x), (-0.43 + 0.1 * (double)y), 0.0);
+        }
+    }
+
+    // set corner nodes as fixed
+    nodes[0][0]->m_fixed = true;
+    nodes[0][9]->m_fixed = true;
+    nodes[9][0]->m_fixed = true;
+    nodes[9][9]->m_fixed = true;
+
+    // set default physical properties for links
+    cGELSkeletonLink::s_default_kSpringElongation = 25.0;  // [N/m]
+    cGELSkeletonLink::s_default_kSpringFlexion = 0.5;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringTorsion = 0.1;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_color.setBlueCornflower();
+
+    // create links between nodes
+    for (int y = 0; y < 9; y++)
+    {
+        for (int x = 0; x < 9; x++)
+        {
+            cGELSkeletonLink* newLinkX0 = new cGELSkeletonLink(nodes[x + 0][y + 0], nodes[x + 1][y + 0]);
+            cGELSkeletonLink* newLinkX1 = new cGELSkeletonLink(nodes[x + 0][y + 1], nodes[x + 1][y + 1]);
+            cGELSkeletonLink* newLinkY0 = new cGELSkeletonLink(nodes[x + 0][y + 0], nodes[x + 0][y + 1]);
+            cGELSkeletonLink* newLinkY1 = new cGELSkeletonLink(nodes[x + 1][y + 0], nodes[x + 1][y + 1]);
+            defObject->m_links.push_front(newLinkX0);
+            defObject->m_links.push_front(newLinkX1);
+            defObject->m_links.push_front(newLinkY0);
+            defObject->m_links.push_front(newLinkY1);
+        }
+    }
+
+    // connect skin (mesh) to skeleton (GEM)
+    defObject->connectVerticesToSkeleton(false);
+
+    // show/hide underlying dynamic skeleton model
+    defObject->m_showSkeletonModel = false;
 
     //--------------------------------------------------------------------------
     // WIDGETS
@@ -528,7 +696,7 @@ void updateGraphics(void)
     /////////////////////////////////////////////////////////////////////
 
     // display haptic rate data
-    labelHapticRate->setText(cStr(frequencyCounter.getFrequency(), 0) + " Hz");
+    labelHapticRate->setText(cStr(freqCounterGraphics.getFrequency(), 0) + " Hz");
 
     // update position of label
     labelHapticRate->setLocalPos((int)(0.5 * (windowW - labelHapticRate->getWidth())), 15);
@@ -564,7 +732,7 @@ void updateGraphics(void)
 void updateHaptics(void)
 {
     // initialize precision clock
-    /*cPrecisionClock clock;
+    cPrecisionClock clock;
     clock.reset();
 
     // simulation in now running
@@ -589,7 +757,7 @@ void updateHaptics(void)
         // clear all external forces
         defWorld->clearExternalForces();
 
-        // compute reaction forces
+        //// compute reaction forces
         cVector3d force(0.0, 0.0, 0.0);
         for (int y = 0; y < 10; y++)
         {
@@ -603,13 +771,13 @@ void updateHaptics(void)
             }
         }
 
-        // integrate dynamics
+        //// integrate dynamics
         defWorld->updateDynamics(time);
 
-        // scale force
+        //// scale force
         force.mul(deviceForceScale / workspaceScaleFactor);
 
-        // send forces to haptic device
+        //// send forces to haptic device
         hapticDevice->setForce(force);
 
         // signal frequency counter
@@ -617,66 +785,66 @@ void updateHaptics(void)
     }
 
     // exit haptics thread
-    simulationFinished = true;*/
+    simulationFinished = true;
 
 
     // initialize frequency counter
-    frequencyCounter.reset();
+    //frequencyCounter.reset();
 
-    // simulation in now running
-    simulationRunning = true;
-    simulationFinished = false;
+    //// simulation in now running
+    //simulationRunning = true;
+    //simulationFinished = false;
 
-    // main haptic simulation loop
-    while (simulationRunning)
-    {
-        /////////////////////////////////////////////////////////////////////
-        // READ HAPTIC DEVICE
-        /////////////////////////////////////////////////////////////////////
+    //// main haptic simulation loop
+    //while (simulationRunning)
+    //{
+    //    /////////////////////////////////////////////////////////////////////
+    //    // READ HAPTIC DEVICE
+    //    /////////////////////////////////////////////////////////////////////
 
-        // read position 
-        cVector3d position;
-        hapticDevice->getPosition(position);
+    //    // read position 
+    //    cVector3d position;
+    //    hapticDevice->getPosition(position);
 
-        // read orientation 
-        cMatrix3d rotation;
-        hapticDevice->getRotation(rotation);
+    //    // read orientation 
+    //    cMatrix3d rotation;
+    //    hapticDevice->getRotation(rotation);
 
-        // read user-switch status (button 0)
-        bool button = false;
-        hapticDevice->getUserSwitch(0, button);
-
-
-        /////////////////////////////////////////////////////////////////////
-        // UPDATE 3D CURSOR MODEL
-        /////////////////////////////////////////////////////////////////////
-
-        // update position and orienation of cursor
-        cursor->setLocalPos(position);
-        cursor->setLocalRot(rotation);
-
-        /////////////////////////////////////////////////////////////////////
-        // COMPUTE FORCES
-        /////////////////////////////////////////////////////////////////////
-
-        cVector3d force(0, 0, 0);
-        cVector3d torque(0, 0, 0);
-        double gripperForce = 0.0;
+    //    // read user-switch status (button 0)
+    //    bool button = false;
+    //    hapticDevice->getUserSwitch(0, button);
 
 
-        /////////////////////////////////////////////////////////////////////
-        // APPLY FORCES
-        /////////////////////////////////////////////////////////////////////
+    //    /////////////////////////////////////////////////////////////////////
+    //    // UPDATE 3D CURSOR MODEL
+    //    /////////////////////////////////////////////////////////////////////
 
-        // send computed force, torque, and gripper force to haptic device
-        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+    //    // update position and orienation of cursor
+    //    device->setLocalPos(position);
+    //    device->setLocalRot(rotation);
 
-        // update frequency counter
-        frequencyCounter.signal(1);
-    }
+    //    /////////////////////////////////////////////////////////////////////
+    //    // COMPUTE FORCES
+    //    /////////////////////////////////////////////////////////////////////
 
-    // exit haptics thread
-    simulationFinished = true;
+    //    cVector3d force(0, 0, 0);
+    //    cVector3d torque(0, 0, 0);
+    //    double gripperForce = 0.0;
+
+
+    //    /////////////////////////////////////////////////////////////////////
+    //    // APPLY FORCES
+    //    /////////////////////////////////////////////////////////////////////
+
+    //    // send computed force, torque, and gripper force to haptic device
+    //    hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+
+    //    // update frequency counter
+    //    frequencyCounter.signal(1);
+    //}
+
+    //// exit haptics thread
+    //simulationFinished = true;
 }
 
 //------------------------------------------------------------------------------
@@ -1060,4 +1228,35 @@ void onRender() {
         }
         glEnd();
     }
+}
+
+cVector3d computeForce(const cVector3d& a_cursor,
+    double a_cursorRadius,
+    const cVector3d& a_spherePos,
+    double a_radius,
+    double a_stiffness)
+{
+    // compute the reaction forces between the tool and the ith sphere.
+    cVector3d force;
+    force.zero();
+    cVector3d vSphereCursor = a_cursor - a_spherePos;
+
+    // check if both objects are intersecting
+    if (vSphereCursor.length() < 0.0000001)
+    {
+        return (force);
+    }
+
+    if (vSphereCursor.length() > (a_cursorRadius + a_radius))
+    {
+        return (force);
+    }
+
+    // compute penetration distance between tool and surface of sphere
+    double penetrationDistance = (a_cursorRadius + a_radius) - vSphereCursor.length();
+    cVector3d forceDirection = cNormalize(vSphereCursor);
+    force = cMul(penetrationDistance * a_stiffness, forceDirection);
+
+    // return result
+    return (force);
 }
