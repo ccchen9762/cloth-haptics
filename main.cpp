@@ -1,23 +1,17 @@
 //==============================================================================
 /*
-    Yibo Wen
+    Yibo Wen, Ching-Chih Chen
 */
 //==============================================================================
+// 
 
 //------------------------------------------------------------------------------
-#include "chai3d.h"
-#include "GEL3D.h"
+#include "cloth.h"
+//------------------------------------------------------------------------------
+
 //------------------------------------------------------------------------------
 using namespace chai3d;
 using namespace std;
-//------------------------------------------------------------------------------
-#include <GLFW/glfw3.h>
-//#include "GL/glut.h"
-#include <vector>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp> //for matrices
-#include <glm/gtc/type_ptr.hpp>
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // GENERAL SETTINGS
@@ -32,10 +26,8 @@ using namespace std;
 */
 cStereoMode stereoMode = C_STEREO_DISABLED;
 
-// fullscreen mode
+// state boolean
 bool fullscreen = false;
-
-// mirrored display
 bool mirroredDisplay = false;
 
 
@@ -48,6 +40,8 @@ cWorld* world;
 
 // a camera to render the world in the window display
 cCamera* camera;
+cVector3d cameraPos;
+cVector3d cameraLookAt;
 
 // a light source to illuminate the objects in the world
 cDirectionalLight* light;
@@ -70,9 +64,6 @@ double cursorWorkspaceRadius;
 // a label to display the rate [Hz] at which the simulation is running
 cLabel* labelHapticRate;
 
-// a small sphere (cursor) representing the haptic device 
-//cShapeSphere* cursor;
-
 // flag to indicate if the haptic simulation currently running
 bool simulationRunning = false;
 
@@ -92,21 +83,13 @@ cThread* hapticsThread;
 GLFWwindow* window = NULL;
 
 // current width of window
-int width = 0;
+int windowWidth = 0;
 
 // current height of window
-int height = 0;
+int windowHeight = 0;
 
 // swap interval for the display context (vertical synchronization)
 int swapInterval = 1;
-
-// information about computer screen and GLUT display window
-//int screenW;
-//int screenH;
-//int windowW;
-//int windowH;
-//int windowPosX;
-//int windowPosY;
 
 //---------------------------------------------------------------------------
 // GEL
@@ -116,17 +99,18 @@ int swapInterval = 1;
 cGELWorld* defWorld;
 
 // object mesh
+cMesh* object;
 cGELMesh* defObject;
 
 // dynamic nodes
-cGELSkeletonNode* nodes[10][10];
+cGELSkeletonNode* nodes[21][21];
 
 // haptic device model
 cShapeSphere* device;
 double deviceRadius;
 
 // radius of the dynamic model sphere (GEM)
-double radius;
+double modelRadius;
 
 // stiffness properties between the haptic device tool and the model (GEM)
 double stiffness;
@@ -136,73 +120,66 @@ double stiffness;
 //------------------------------------------------------------------------------
 
 // grid size
-int numX = 20, numY = 20;
-const size_t total_points = (numX + 1) * (numY + 1);
-float fullsize = 4.0f;
-float halfsize = fullsize / 2.0f;
+extern int numX, numY;
+extern size_t total_points;
+extern float fullsize;
+extern float halfsize;
 
 // FPS
-float timeStep = 1 / 120.0f;
-float currentTime = 0;
-double accumulator = timeStep;
-int selected_index = -1;
-bool bDrawPoints = false;
+extern float timeStep;
+extern float currentTime;
+extern double accumulator;
+extern int selected_index;
+extern bool bDrawPoints;
 
-struct Spring {
-    int p1, p2;
-    float rest_length;
-    float Ks, Kd;
-    int type;
-};
+extern std::vector<GLushort> indices;
+extern std::vector<Spring> springs;
 
-vector<GLushort> indices;
-vector<Spring> springs;
+extern std::vector<glm::vec3> X;
+extern std::vector<glm::vec3> V;
+extern std::vector<glm::vec3> F;
 
-vector<glm::vec3> X;
-vector<glm::vec3> V;
-vector<glm::vec3> F;
+extern int oldX, oldY;
+extern float rX, rY;
+extern int state;
+extern float dist;
+extern const int GRID_SIZE;
 
-int oldX = 0, oldY = 0;
-float rX = 15, rY = 0;
-int state = 1;
-float dist = -15;
-const int GRID_SIZE = 10;
+extern const int STRUCTURAL_SPRING;
+extern const int SHEAR_SPRING;
+extern const int BEND_SPRING;
+extern int spring_count;
 
-const int STRUCTURAL_SPRING = 0;
-const int SHEAR_SPRING = 1;
-const int BEND_SPRING = 2;
-int spring_count = 0;
+extern const float DEFAULT_DAMPING;
+extern float KsStruct, KdStruct;
+extern float KsShear, KdShear;
+extern float KsBend, KdBend;
+extern glm::vec3 gravity;
+extern float mass;
 
-const float DEFAULT_DAMPING = -0.1f;
-float   KsStruct = 0.5f, KdStruct = -0.25f;
-float   KsShear = 0.5f, KdShear = -0.25f;
-float   KsBend = 0.85f, KdBend = -0.25f;
-glm::vec3 gravity = glm::vec3(0.0f, -0.00981f, 0.0f);
-float mass = 0.5f;
+extern GLint viewport[4];
+extern GLdouble MV[16];
+extern GLdouble P[16];
 
-GLint viewport[4];
-GLdouble MV[16];
-GLdouble P[16];
+extern glm::vec3 Up, Right, viewDir;
 
-glm::vec3 Up = glm::vec3(0, 1, 0), Right, viewDir;
+extern LARGE_INTEGER frequency;        // ticks per second
+extern LARGE_INTEGER t1, t2;           // ticks
+extern double frameTimeQP;
+extern float frameTime;
 
-LARGE_INTEGER frequency;        // ticks per second
-LARGE_INTEGER t1, t2;           // ticks
-double frameTimeQP = 0;
-float frameTime = 0;
+extern float startTime, fps;
+extern int totalFrames;
 
-float startTime = 0, fps = 0;
-int totalFrames = 0;
+extern char info[MAX_PATH];
 
-char info[MAX_PATH] = { 0 };
-
-int iStacks = 30;
-int iSlices = 30;
-float fRadius = 1;
+extern int iStacks;
+extern int iSlices;
+extern float fRadius;
 
 // Resolve constraint in object space
-glm::vec3 center = glm::vec3(0, 0, 0); //object space center of ellipsoid
-//float radius = 1;                    //object space radius of ellipsoid
+extern glm::vec3 center; //object space center of ellipsoid
+//float radius = 1;      //object space radius of ellipsoid
 
 
 //------------------------------------------------------------------------------
@@ -210,19 +187,22 @@ glm::vec3 center = glm::vec3(0, 0, 0); //object space center of ellipsoid
 //------------------------------------------------------------------------------
 
 // callback when the window display is resized
-void resizeWindow(int w, int h);
+void windowSizeCallback(GLFWwindow* a_window, int a_width, int a_height);
+
+// callback when an error GLFW occurs
+void errorCallback(int error, const char* a_description);
 
 // callback when a key is pressed
-void keySelect(unsigned char key, int x, int y);
+void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, int a_mods);
+
+// callback when a mouse button is pressed
+void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a_mods);
 
 // callback to render graphic scene
 void updateGraphics(void);
 
 // main haptics simulation loop
 void updateHaptics(void);
-
-// callback of GLUT timer
-void graphicsTimer(int data);
 
 // function that closes the application
 void close(void);
@@ -233,51 +213,6 @@ cVector3d computeForce(const cVector3d& a_cursor,
     const cVector3d& a_spherePos,
     double a_radius,
     double a_stiffness);
-
-//------------------------------------------------------------------------------
-// DECLARED GRAPHICS FUNCTIONS
-//------------------------------------------------------------------------------
-
-// move to next state
-void stepPhysics(float dt);
-
-// add spring to the grid
-void addSpring(int a, int b, float ks, float kd, int type);
-
-// callback when mouse is down
-void onMouseDown(int button, int s, int x, int y);
-
-// callback when mouse is moved
-void onMouseMove(int x, int y);
-
-// draw lines of the grid
-void drawGrid();
-
-// initialize scene
-void initGL();
-
-// update cloth display in updateGraphics
-void onRender();
-
-// compute current forces
-void computeForces();
-
-// discrete step with euler
-void integrateEuler(float deltaTime);
-
-// apply dynamic inverse
-void applyProvotDynamicInverse();
-
-// callback when idle
-void onIdle();
-
-void errorCallback(int error, const char* a_description);
-
-void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, int a_mods);
-
-void windowSizeCallback(GLFWwindow* a_window, int a_width, int a_height);
-
-void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a_mods);
 
 
 //==============================================================================
@@ -294,15 +229,15 @@ int main(int argc, char* argv[])
     // INITIALIZATION
     //--------------------------------------------------------------------------
 
-    cout << endl;
-    cout << "-----------------------------------" << endl;
-    cout << "CHAI3D" << endl;
-    cout << "-----------------------------------" << endl << endl << endl;
-    cout << "Keyboard Options:" << endl << endl;
-    cout << "[f] - Enable/Disable full screen mode" << endl;
-    cout << "[m] - Enable/Disable display points" << endl;
-    cout << "[q] - Exit application" << endl;
-    cout << endl << endl;
+    std::cout << std::endl;
+    std::cout << "-----------------------------------" << std::endl;
+    std::cout << "CHAI3D" << std::endl;
+    std::cout << "-----------------------------------" << std::endl << std::endl << std::endl;
+    std::cout << "Keyboard Options:" << std::endl << std::endl;
+    std::cout << "[f] - Enable/Disable full screen mode" << std::endl;
+    std::cout << "[m] - Enable/Disable display points" << std::endl;
+    std::cout << "[q] - Exit application" << std::endl;
+    std::cout << std::endl << std::endl;
 
 
     //--------------------------------------------------------------------------
@@ -312,7 +247,7 @@ int main(int argc, char* argv[])
     // initialize GLFW library
     if (!glfwInit())
     {
-        cout << "failed initialization" << endl;
+        std::cout << "failed initialization" << std::endl;
         cSleepMs(1000);
         return 1;
     }
@@ -345,7 +280,7 @@ int main(int argc, char* argv[])
     window = glfwCreateWindow(w, h, "CHAI3D", NULL, NULL);
     if (!window)
     {
-        cout << "failed to create window" << endl;
+        std::cout << "failed to create window" << std::endl;
         cSleepMs(1000);
         glfwTerminate();
         return 1;
@@ -353,13 +288,16 @@ int main(int argc, char* argv[])
 
 
     // get width and height of window
-    glfwGetWindowSize(window, &width, &height);
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
 
     // set position of window
     glfwSetWindowPos(window, x, y);
 
     // set key callback
     glfwSetKeyCallback(window, keyCallback);
+
+    // set mouse button callback
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
 
     // set resize callback
     glfwSetWindowSizeCallback(window, windowSizeCallback);
@@ -394,10 +332,13 @@ int main(int argc, char* argv[])
     camera = new cCamera(world);
     world->addChild(camera);
 
+    cameraPos = cVector3d(0.0, 0.5, 0.8);
+    cameraLookAt = cVector3d(0.0, 0.0, 0.3);
+
     // position and orient the camera
-    camera->set(cVector3d(1.5, 0.0, 1.0),    // camera position (eye)
-        cVector3d(0.0, 0.0, 0.0),    // look at position (target)
-        cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
+    camera->set(cameraPos,    // camera position (eye)
+        cameraLookAt,    // look at position (target)
+        cVector3d(0.0, 1.0, 0.0));   // direction of the (up) vector
 
 // set the near and far clipping planes of the camera
     camera->setClippingPlanes(0.01, 100.0);
@@ -406,8 +347,8 @@ int main(int argc, char* argv[])
     camera->setStereoMode(stereoMode);
 
     // set stereo eye separation and focal length (applies only if stereo is enabled)
-    camera->setStereoEyeSeparation(0.01);
-    camera->setStereoFocalLength(0.5);
+    camera->setStereoEyeSeparation(0.02);
+    camera->setStereoFocalLength(3.0);
 
     // set vertical mirrored display mode
     camera->setMirrorVertical(mirroredDisplay);
@@ -425,17 +366,7 @@ int main(int argc, char* argv[])
     light->setEnabled(true);
 
     // define direction of light beam
-    light->setDir(-1.0, 0.0, 0.0);
-
-    // create a sphere (cursor) to represent the haptic device
-    //device = new cShapeSphere(0.1);
-
-    // insert cursor inside world
-    //world->addChild(device);
-
-    // initialize scene
-    initGL();
-
+    light->setDir(0.0, -1.0, -1.0);
 
     //--------------------------------------------------------------------------
     // HAPTIC DEVICE
@@ -501,64 +432,107 @@ int main(int argc, char* argv[])
     defWorld = new cGELWorld();
     world->addChild(defWorld);
 
+    // modify from here 
+
+    // create a deformable mesh
+    object = new cMesh();
+    world->addChild(object);
+
+    // set the position of the object at the center of the world
+    object->setLocalPos(0.0, 0.0, 0.0);
+
+    // Since we want to see our polygons from both sides, we disable culling.
+    object->setUseCulling(false);
+
+    initCloth();
+
+    for (int i = 0; i < indices.size(); i += 3) {
+        // define triangle points
+        cVector3d p0 = cVector3d(X[indices[i + 0]].x, X[indices[i + 0]].y, X[indices[i + 0]].z);
+        cVector3d p1 = cVector3d(X[indices[i + 1]].x, X[indices[i + 1]].y, X[indices[i + 1]].z);
+        cVector3d p2 = cVector3d(X[indices[i + 2]].x, X[indices[i + 2]].y, X[indices[i + 2]].z);
+
+        // define a triangle color
+        cColorf color;
+        color.set((X[indices[i + 0]].x+1)*0.5, (X[indices[i + 0]].z+1)*0.5, 0.5);
+
+        // create three new vertices
+        int vertex0 = object->newVertex();
+        int vertex1 = object->newVertex();
+        int vertex2 = object->newVertex();
+
+        // set position of each vertex
+        object->m_vertices->setLocalPos(vertex0, p0);
+        object->m_vertices->setLocalPos(vertex1, p1);
+        object->m_vertices->setLocalPos(vertex2, p2);
+
+        // assign color to each vertex
+        object->m_vertices->setColor(vertex0, color);
+        object->m_vertices->setColor(vertex1, color);
+        object->m_vertices->setColor(vertex2, color);
+
+        // create new triangle from vertices
+        object->newTriangle(vertex0, vertex1, vertex2);
+    }
+
+    // compute surface normals
+    object->computeAllNormals();
+
+    // we indicate that we ware rendering triangles by using specific colors for each of them (see above)
+    object->setUseVertexColors(true);
+
     // create a deformable mesh
     defObject = new cGELMesh();
     defWorld->m_gelMeshes.push_front(defObject);
-
-    // set some material color on the object
-    cMaterial mat;
-    mat.setWhite();
-    mat.setShininess(100);
-    defObject->setMaterial(mat, true);
-
-    // set object to be transparent
-    defObject->setTransparencyLevel(0.65, true, true);
 
     // build dynamic vertices
     defObject->buildVertices();
 
     // set default properties for skeleton nodes
-    cGELSkeletonNode::s_default_radius = 0.05;  // [m]
+    cGELSkeletonNode::s_default_radius = 0.02;  // [m]
     cGELSkeletonNode::s_default_kDampingPos = 2.5;
     cGELSkeletonNode::s_default_kDampingRot = 0.6;
-    cGELSkeletonNode::s_default_mass = 0.002; // [kg]
+    cGELSkeletonNode::s_default_mass = 0.0002; // [kg]
     cGELSkeletonNode::s_default_showFrame = true;
-    cGELSkeletonNode::s_default_color.setBlueCornflower();
+    //cGELSkeletonNode::s_default_color.setBlueCornflower();
+    cGELSkeletonLink::s_default_color.set(0.2, 0.2, 1.0);
     cGELSkeletonNode::s_default_useGravity = true;
-    cGELSkeletonNode::s_default_gravity.set(0.00, 0.00, -9.81);
-    radius = cGELSkeletonNode::s_default_radius;
+    cGELSkeletonNode::s_default_gravity.set(0.00, -9.81, 0.00);
+    modelRadius = cGELSkeletonNode::s_default_radius;
 
     // use internal skeleton as deformable model
     defObject->m_useSkeletonModel = true;
 
     // create an array of nodes
-    for (int y = 0; y < 10; y++)
+    for (int y = 0; y < 21; y++)
     {
-        for (int x = 0; x < 10; x++)
+        for (int x = 0; x < 21; x++)
         {
             cGELSkeletonNode* newNode = new cGELSkeletonNode();
+            newNode->m_color.set(0.1, 0.1, 0.1);
+            std::cout << "R: " << newNode->m_color.getR() << std::endl;
             nodes[x][y] = newNode;
             defObject->m_nodes.push_front(newNode);
-            newNode->m_pos.set((-0.45 + 0.1 * (double)x), (-0.43 + 0.1 * (double)y), 0.0);
+            newNode->m_pos.set((-0.4 + 0.04 * (double)x), -0.2, (-0.4 + 0.04 * (double)y));
         }
     }
 
     // set corner nodes as fixed
     nodes[0][0]->m_fixed = true;
-    nodes[0][9]->m_fixed = true;
-    nodes[9][0]->m_fixed = true;
-    nodes[9][9]->m_fixed = true;
+    nodes[0][20]->m_fixed = true;
+    nodes[20][0]->m_fixed = true;
+    nodes[20][20]->m_fixed = true;
 
     // set default physical properties for links
     cGELSkeletonLink::s_default_kSpringElongation = 25.0;  // [N/m]
-    cGELSkeletonLink::s_default_kSpringFlexion = 0.5;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringFlexion = 0.00001;   // [Nm/RAD]
     cGELSkeletonLink::s_default_kSpringTorsion = 0.1;   // [Nm/RAD]
     cGELSkeletonLink::s_default_color.setBlueCornflower();
 
     // create links between nodes
-    for (int y = 0; y < 9; y++)
+    for (int y = 0; y < 20; y++)
     {
-        for (int x = 0; x < 9; x++)
+        for (int x = 0; x < 20; x++)
         {
             cGELSkeletonLink* newLinkX0 = new cGELSkeletonLink(nodes[x + 0][y + 0], nodes[x + 1][y + 0]);
             cGELSkeletonLink* newLinkX1 = new cGELSkeletonLink(nodes[x + 0][y + 1], nodes[x + 1][y + 1]);
@@ -575,7 +549,9 @@ int main(int argc, char* argv[])
     defObject->connectVerticesToSkeleton(false);
 
     // show/hide underlying dynamic skeleton model
-    defObject->m_showSkeletonModel = false;
+    defObject->m_showSkeletonModel = true;
+
+    // modify until here 
 
     //--------------------------------------------------------------------------
     // WIDGETS
@@ -586,8 +562,8 @@ int main(int argc, char* argv[])
 
     // create a label to display the haptic rate of the simulation
     labelHapticRate = new cLabel(font);
-    labelHapticRate->m_fontColor.setWhite();
     camera->m_frontLayer->addChild(labelHapticRate);
+    labelHapticRate->m_fontColor.setWhite();
 
 
     //--------------------------------------------------------------------------
@@ -602,13 +578,13 @@ int main(int argc, char* argv[])
     atexit(close);
 
     // start the main graphics rendering loop
-    windowSizeCallback(window, width, height);
+    windowSizeCallback(window, windowWidth, windowHeight);
 
     // main graphic loop
     while (!glfwWindowShouldClose(window))
     {
         // get width and height of window
-        glfwGetWindowSize(window, &width, &height);
+        glfwGetWindowSize(window, &windowWidth, &windowHeight);
 
         // render graphics
         updateGraphics();
@@ -638,8 +614,8 @@ int main(int argc, char* argv[])
 void windowSizeCallback(GLFWwindow* a_window, int a_width, int a_height)
 {
     // update window size
-    width = a_width;
-    height = a_height;
+    windowWidth = a_width;
+    windowHeight = a_height;
 }
 
 //------------------------------------------------------------------------------
@@ -666,9 +642,51 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
     }
 
     // option - show/hide skeleton
-    else if (a_key == GLFW_KEY_S)
+    else if (a_key == GLFW_KEY_K)
     {
         defObject->m_showSkeletonModel = !defObject->m_showSkeletonModel;
+    }
+
+    else if (a_key == GLFW_KEY_L)
+    {
+        bool useWireMode = !object->getWireMode();
+        object->setWireMode(useWireMode);
+    }
+
+    if (a_key == GLFW_KEY_W) {
+        cameraPos.z(cameraPos.z() - 0.1);
+        cameraLookAt.z(cameraLookAt.z() - 0.1);
+
+        camera->set(cameraPos,    // camera position (eye)
+            cameraLookAt,    // look at position (target)
+            cVector3d(0.0, 1.0, 0.0));
+    }
+
+    if (a_key == GLFW_KEY_A) {
+        cameraPos.x(cameraPos.x() - 0.1);
+        cameraLookAt.x(cameraLookAt.x() - 0.1);
+
+        camera->set(cameraPos,    // camera position (eye)
+            cameraLookAt,    // look at position (target)
+            cVector3d(0.0, 1.0, 0.0));
+    }
+
+    if (a_key == GLFW_KEY_S) {
+        cameraPos.z(cameraPos.z() + 0.1);
+        cameraLookAt.z(cameraLookAt.z() + 0.1);
+
+        camera->set(cameraPos,    // camera position (eye)
+            cameraLookAt,    // look at position (target)
+            cVector3d(0.0, 1.0, 0.0));
+    }
+
+    if (a_key == GLFW_KEY_D) {
+        cameraPos.x(cameraPos.x() + 0.1);
+        cameraLookAt.x(cameraLookAt.x() + 0.1);
+
+        camera->set(cameraPos,    // camera position (eye)
+            cameraLookAt,    // look at position (target)
+            cVector3d(0.0, 1.0, 0.0));
     }
 
     // option - toggle fullscreen
@@ -710,11 +728,10 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
     {
         bDrawPoints = !bDrawPoints;
     }
-    else if (a_key == GLFW_KEY_Q || a_key == GLFW_KEY_ESCAPE)
-    {
-        close();
-        exit(0);
-    }
+}
+
+void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
+
 }
 
 //------------------------------------------------------------------------------
@@ -746,18 +763,6 @@ void close(void)
 
 //------------------------------------------------------------------------------
 
-//void graphicsTimer(int data)
-//{
-//    if (simulationRunning)
-//    {
-//        glutPostRedisplay();
-//    }
-//
-//    glutTimerFunc(50, graphicsTimer, 0);
-//}
-
-//------------------------------------------------------------------------------
-
 void updateGraphics(void)
 {
     /////////////////////////////////////////////////////////////////////
@@ -765,10 +770,11 @@ void updateGraphics(void)
     /////////////////////////////////////////////////////////////////////
 
     // display haptic rate data
-    labelHapticRate->setText(cStr(freqCounterGraphics.getFrequency(), 0) + " Hz");
+    labelHapticRate->setText(cStr(freqCounterGraphics.getFrequency(), 0) + " Hz / " +
+        cStr(freqCounterHaptics.getFrequency(), 0) + " Hz");
 
     // update position of label
-    labelHapticRate->setLocalPos((int)(0.5 * (width - labelHapticRate->getWidth())), 15);
+    labelHapticRate->setLocalPos((int)(0.5 * (windowWidth - labelHapticRate->getWidth())), 15);
 
 
     // update skins deformable objects
@@ -782,14 +788,10 @@ void updateGraphics(void)
     world->updateShadowMaps(false, mirroredDisplay);
 
     // render world
-    camera->renderView(width, height);
+    camera->renderView(windowWidth, windowHeight);
 
     // render cloth
-    //onRender();
-    drawGrid();
-
-    // swap buffers
-    //glutSwapBuffers();
+    //drawGrid();
 
     // wait until all GL commands are completed
     glFinish();
@@ -830,14 +832,14 @@ void updateHaptics(void)
         // clear all external forces
         defWorld->clearExternalForces();
 
-        //// compute reaction forces
+        // compute reaction forces
         cVector3d force(0.0, 0.0, 0.0);
         for (int y = 0; y < 10; y++)
         {
             for (int x = 0; x < 10; x++)
             {
                 cVector3d nodePos = nodes[x][y]->m_pos;
-                cVector3d f = computeForce(pos, deviceRadius, nodePos, radius, stiffness);
+                cVector3d f = computeForce(pos, deviceRadius, nodePos, modelRadius, stiffness);
                 cVector3d tmpfrc = -1.0 * f;
                 nodes[x][y]->setExternalForce(tmpfrc);
                 force.add(f);
@@ -920,6 +922,39 @@ void updateHaptics(void)
     //simulationFinished = true;
 }
 
+//---------------------------------------------------------------------------
+
+cVector3d computeForce(const cVector3d& a_cursor,
+    double a_cursorRadius,
+    const cVector3d& a_spherePos,
+    double a_radius,
+    double a_stiffness)
+{
+    // compute the reaction forces between the tool and the ith sphere.
+    cVector3d force;
+    force.zero();
+    cVector3d vSphereCursor = a_cursor - a_spherePos;
+
+    // check if both objects are intersecting
+    if (vSphereCursor.length() < 0.0000001)
+    {
+        return (force);
+    }
+
+    if (vSphereCursor.length() > (a_cursorRadius + a_radius))
+    {
+        return (force);
+    }
+
+    // compute penetration distance between tool and surface of sphere
+    double penetrationDistance = (a_cursorRadius + a_radius) - vSphereCursor.length();
+    cVector3d forceDirection = cNormalize(vSphereCursor);
+    force = cMul(penetrationDistance * a_stiffness, forceDirection);
+
+    // return result
+    return (force);
+}
+
 //------------------------------------------------------------------------------
 
 void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a_mods)
@@ -927,17 +962,24 @@ void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a
     double x, y;
     glfwGetCursorPos(window, &x, &y);
 
+    
+
     if (a_button == GLFW_MOUSE_BUTTON_LEFT && a_action == GLFW_PRESS)
     {
+        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+            std::cout << "l press" << std::endl;
+        }
+
+        
         oldX = x;
         oldY = y;
-        int window_y = (height - y);
-        float norm_y = float(window_y) / float(height / 2.0);
+        int window_y = (windowHeight - y);
+        float norm_y = float(window_y) / float(windowHeight / 2.0);
         int window_x = x;
-        float norm_x = float(window_x) / float(width / 2.0);
+        float norm_x = float(window_x) / float(windowWidth / 2.0);
         
         float winZ = 0;
-        glReadPixels(x, height - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+        glReadPixels(x, windowHeight - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
         if (winZ == 1)
             winZ = 0;
         double objX = 0, objY = 0, objZ = 0;
@@ -951,13 +993,7 @@ void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a
                 break;
             }
         }
-    }
-
-    if (a_button == GLFW_MOUSE_BUTTON_MIDDLE)
-        state = 0;
-    else
-        state = 1;
-        
+    }   
     if (a_action == GLFW_RELEASE) {
         selected_index = -1;
         glfwSetCursorPos(window, x, y);
@@ -1041,241 +1077,7 @@ void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a
 //    glutPostRedisplay();
 //}
 
-//------------------------------------------------------------------------------
 
-/*void onIdle() {
-    //Fixed time stepping + rendering at different fps
-    if (accumulator >= timeStep)
-    {
-        stepPhysics(timeStep);
-        accumulator -= timeStep;
-    }
-    glutPostRedisplay();
-}*/
-
-//------------------------------------------------------------------------------
-
-void stepPhysics(float dt) {
-    computeForces();
-
-    //for Explicit Euler
-    integrateEuler(dt);
-
-    applyProvotDynamicInverse();
-}
-
-//------------------------------------------------------------------------------
-
-void computeForces() {
-    size_t i = 0;
-    /*std::cout << "points " << total_points << std::endl;
-    std::cout << "x " << numX << std::endl;*/
-    for (i = 0; i < total_points; i++) {
-        F[i] = glm::vec3(0);
-
-        //add gravity force only for non-fixed points
-        if (i != 0 && i != numX && i != 440 && i != 420)
-            F[i] += gravity;
-
-        //add force due to damping of velocity
-
-        F[i] += DEFAULT_DAMPING * V[i];
-    }
-
-    //add spring forces
-    for (i = 0; i < springs.size(); i++) {
-        glm::vec3 p1 = X[springs[i].p1];
-        glm::vec3 p2 = X[springs[i].p2];
-        glm::vec3 v1 = V[springs[i].p1];
-        glm::vec3 v2 = V[springs[i].p2];
-        glm::vec3 deltaP = p1 - p2;
-        glm::vec3 deltaV = v1 - v2;
-        float dist = glm::length(deltaP);
-
-        float leftTerm = -springs[i].Ks * (dist - springs[i].rest_length);
-        float rightTerm = springs[i].Kd * (glm::dot(deltaV, deltaP) / dist);
-        glm::vec3 springForce = (leftTerm + rightTerm) * glm::normalize(deltaP);
-
-        if (springs[i].p1 != 0 && springs[i].p1 != numX && springs[i].p1 != 440 && springs[i].p1 != 420)
-            F[springs[i].p1] += springForce;
-        if (springs[i].p2 != 0 && springs[i].p2 != numX && springs[i].p2 != 440 && springs[i].p2 != 420)
-            F[springs[i].p2] -= springForce;
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void integrateEuler(float deltaTime) {
-    float deltaTimeMass = deltaTime / mass;
-    size_t i = 0;
-
-    for (i = 0; i < total_points; i++) {
-        glm::vec3 oldV = V[i];
-        
-        if (i != 0 && i != numX && i != 440 && i != 420) {
-            V[i] += (F[i] * deltaTimeMass);
-            X[i] += deltaTime * oldV;
-        }
-        
-        if (X[i].y < 0) {
-            X[i].y = 0;
-        }
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void applyProvotDynamicInverse() {
-
-    for (size_t i = 0; i < springs.size(); i++) {
-        //check the current lengths of all springs
-        glm::vec3 p1 = X[springs[i].p1];
-        glm::vec3 p2 = X[springs[i].p2];
-        glm::vec3 deltaP = p1 - p2;
-        float dist = glm::length(deltaP);
-        if (dist > springs[i].rest_length) {
-            dist -= (springs[i].rest_length);
-            dist /= 2.0f;
-            deltaP = glm::normalize(deltaP);
-            deltaP *= dist;
-            if (springs[i].p1 == 0 || springs[i].p1 == numX || springs[i].p1 == 440 || springs[i].p1 == 420) {
-                V[springs[i].p2] += deltaP;
-            }
-            else if (springs[i].p2 == 0 || springs[i].p2 == numX || springs[i].p2 == 440 || springs[i].p2 == 420) {
-                V[springs[i].p1] -= deltaP;
-            }
-            else {
-                V[springs[i].p1] -= deltaP;
-                V[springs[i].p2] += deltaP;
-            }
-        }
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void addSpring(int a, int b, float ks, float kd, int type) {
-    Spring spring;
-    spring.p1 = a;
-    spring.p2 = b;
-    spring.Ks = ks;
-    spring.Kd = kd;
-    spring.type = type;
-    glm::vec3 deltaP = X[a] - X[b];
-    spring.rest_length = sqrt(glm::dot(deltaP, deltaP));
-    springs.push_back(spring);
-}
-
-//------------------------------------------------------------------------------
-
-void drawGrid()
-{
-    glBegin(GL_LINES);
-    glColor3f(0.5f, 0.5f, 0.5f);
-    for (int i = -GRID_SIZE; i <= GRID_SIZE; i++)
-    {
-        glVertex3f((float)i, 0, (float)-GRID_SIZE);
-        glVertex3f((float)i, 0, (float)GRID_SIZE);
-
-        glVertex3f((float)-GRID_SIZE, 0, (float)i);
-        glVertex3f((float)GRID_SIZE, 0, (float)i);
-    }
-    glEnd();
-}
-
-//------------------------------------------------------------------------------
-
-void initGL() {
-    startTime = (float)glfwGetTime();
-    currentTime = startTime;
-
-    // get ticks per second
-    QueryPerformanceFrequency(&frequency);
-
-    // start timer
-    QueryPerformanceCounter(&t1);
-
-    glEnable(GL_DEPTH_TEST);
-    int i = 0, j = 0, count = 0;
-    int l1 = 0, l2 = 0;
-    float ypos = 7.0f;
-    int v = numY + 1;
-    int u = numX + 1;
-
-    indices.resize(numX * numY * 2 * 3);
-    X.resize(total_points);
-    V.resize(total_points);
-    F.resize(total_points);
-
-    // fill in X
-    for (j = 0; j < v; j++) {
-        for (i = 0; i < u; i++) {
-            //X[count++] = glm::vec3( ((float(i)/(u-1)) *2-1)* halfsize, fullsize+1, ((float(j)/(v-1) )* fullsize));
-            X[count++] = glm::vec3(((float(i) / (u - 1)) * 2 - 1) * halfsize, 2.0f, ((float(j) / (v - 1)) * fullsize));
-        }
-    }
-
-    // fill in V
-    memset(&(V[0].x), 0, total_points * sizeof(glm::vec3));
-
-    // fill in indices
-    GLushort* id = &indices[0];
-    for (i = 0; i < numY; i++) {
-        for (j = 0; j < numX; j++) {
-            int i0 = i * (numX + 1) + j;
-            int i1 = i0 + 1;
-            int i2 = i0 + (numX + 1);
-            int i3 = i2 + 1;
-            if ((j + i) % 2) {
-                *id++ = i0; *id++ = i2; *id++ = i1;
-                *id++ = i1; *id++ = i2; *id++ = i3;
-            }
-            else {
-                *id++ = i0; *id++ = i2; *id++ = i3;
-                *id++ = i0; *id++ = i3; *id++ = i1;
-            }
-        }
-    }
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glPointSize(5);
-
-    //wglSwapIntervalEXT(0);
-
-    // setup springs
-    // Horizontal
-    for (l1 = 0; l1 < v; l1++)  // v
-        for (l2 = 0; l2 < (u - 1); l2++) {
-            addSpring((l1 * u) + l2, (l1 * u) + l2 + 1, KsStruct, KdStruct, STRUCTURAL_SPRING);
-        }
-
-    // Vertical
-    for (l1 = 0; l1 < (u); l1++)
-        for (l2 = 0; l2 < (v - 1); l2++) {
-            addSpring((l2 * u) + l1, ((l2 + 1) * u) + l1, KsStruct, KdStruct, STRUCTURAL_SPRING);
-        }
-
-    // Shearing Springs
-    for (l1 = 0; l1 < (v - 1); l1++)
-        for (l2 = 0; l2 < (u - 1); l2++) {
-            addSpring((l1 * u) + l2, ((l1 + 1) * u) + l2 + 1, KsShear, KdShear, SHEAR_SPRING);
-            addSpring(((l1 + 1) * u) + l2, (l1 * u) + l2 + 1, KsShear, KdShear, SHEAR_SPRING);
-        }
-
-    // Bend Springs
-    for (l1 = 0; l1 < (v); l1++) {
-        for (l2 = 0; l2 < (u - 2); l2++) {
-            addSpring((l1 * u) + l2, (l1 * u) + l2 + 2, KsBend, KdBend, BEND_SPRING);
-        }
-        addSpring((l1 * u) + (u - 3), (l1 * u) + (u - 1), KsBend, KdBend, BEND_SPRING);
-    }
-    for (l1 = 0; l1 < (u); l1++) {
-        for (l2 = 0; l2 < (v - 2); l2++) {
-            addSpring((l2 * u) + l1, ((l2 + 2) * u) + l1, KsBend, KdBend, BEND_SPRING);
-        }
-        addSpring(((v - 3) * u) + l1, ((v - 1) * u) + l1, KsBend, KdBend, BEND_SPRING);
-    }
-}
 
 ////------------------------------------------------------------------------------
 //
@@ -1345,33 +1147,3 @@ void initGL() {
 //    }
 //}
 
-cVector3d computeForce(const cVector3d& a_cursor,
-    double a_cursorRadius,
-    const cVector3d& a_spherePos,
-    double a_radius,
-    double a_stiffness)
-{
-    // compute the reaction forces between the tool and the ith sphere.
-    cVector3d force;
-    force.zero();
-    cVector3d vSphereCursor = a_cursor - a_spherePos;
-
-    // check if both objects are intersecting
-    if (vSphereCursor.length() < 0.0000001)
-    {
-        return (force);
-    }
-
-    if (vSphereCursor.length() > (a_cursorRadius + a_radius))
-    {
-        return (force);
-    }
-
-    // compute penetration distance between tool and surface of sphere
-    double penetrationDistance = (a_cursorRadius + a_radius) - vSphereCursor.length();
-    cVector3d forceDirection = cNormalize(vSphereCursor);
-    force = cMul(penetrationDistance * a_stiffness, forceDirection);
-
-    // return result
-    return (force);
-}
