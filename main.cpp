@@ -53,6 +53,8 @@ cHapticDeviceHandler* handler;
 // a pointer to the current haptic device
 cGenericHapticDevicePtr hapticDevice;
 
+cToolCursor* tool;
+
 // force scale factor
 double deviceForceScale;
 
@@ -92,6 +94,16 @@ int windowHeight = 0;
 // swap interval for the display context (vertical synchronization)
 int swapInterval = 1;
 
+//------------------------------------------------------------------------------
+// DECLARED MACROS
+//------------------------------------------------------------------------------
+
+// root resource path
+string resourceRoot;
+
+// convert to resource path
+#define RESOURCE_PATH(p)    (char*)((resourceRoot+string(p)).c_str())
+
 //---------------------------------------------------------------------------
 // GEL
 //---------------------------------------------------------------------------
@@ -100,6 +112,7 @@ int swapInterval = 1;
 cGELWorld* defWorld;
 
 // object mesh
+cMesh* tableObject;
 cMesh* clothObject;
 cGELMesh* defObject;
 
@@ -116,73 +129,26 @@ double modelRadius;
 // stiffness properties between the haptic device tool and the model (GEM)
 double stiffness;
 
+float tableHeight = -0.5;
+
 //------------------------------------------------------------------------------
 // DECLARED GRAPHICS VARIABLES
 //------------------------------------------------------------------------------
 
-// grid size
+//// grid size
 extern int numX, numY;
 extern size_t total_points;
-extern float fullsize;
-extern float halfsize;
 
-// FPS
-extern float timeStep;
-extern float currentTime;
-extern double accumulator;
 extern int selected_index;
-extern bool bDrawPoints;
-
+//
 extern std::vector<GLushort> indices;
-extern std::vector<Spring> springs;
-
 extern std::vector<glm::vec3> X;
-extern std::vector<glm::vec3> V;
-extern std::vector<glm::vec3> F;
-
+//
 extern int oldX, oldY;
-extern float rX, rY;
-extern int state;
-extern float dist;
-extern const int GRID_SIZE;
-
-extern const int STRUCTURAL_SPRING;
-extern const int SHEAR_SPRING;
-extern const int BEND_SPRING;
-extern int spring_count;
-
-extern const float DEFAULT_DAMPING;
-extern float KsStruct, KdStruct;
-extern float KsShear, KdShear;
-extern float KsBend, KdBend;
-extern glm::vec3 gravity;
-extern float mass;
 
 extern GLint viewport[4];
 extern GLdouble MV[16];
 extern GLdouble P[16];
-
-extern glm::vec3 Up, Right, viewDir;
-
-extern LARGE_INTEGER frequency;        // ticks per second
-extern LARGE_INTEGER t1, t2;           // ticks
-extern double frameTimeQP;
-extern float frameTime;
-
-extern float startTime, fps;
-extern int totalFrames;
-
-extern char info[MAX_PATH];
-
-extern int iStacks;
-extern int iSlices;
-extern float fRadius;
-
-// Resolve constraint in object space
-extern glm::vec3 center; //object space center of ellipsoid
-//float radius = 1;      //object space radius of ellipsoid
-
-bool renderCloth = false;
 
 //------------------------------------------------------------------------------
 // DECLARED CHAI3D FUNCTIONS
@@ -205,6 +171,8 @@ void updateGraphics(void);
 
 // main haptics simulation loop
 void updateHaptics(void);
+
+void clothTableCollision(void);
 
 // function that closes the application
 void close(void);
@@ -241,6 +209,9 @@ int main(int argc, char* argv[])
     std::cout << "[q] - Exit application" << std::endl;
     std::cout << std::endl << std::endl;
 
+    // parse first arg to try and locate resources
+    resourceRoot = string(argv[0]).substr(0, string(argv[0]).find_last_of("/\\") + 1);
+    std::cout << string(argv[0]) << std::endl;
 
     //--------------------------------------------------------------------------
     // OPENGL - WINDOW DISPLAY
@@ -334,7 +305,7 @@ int main(int argc, char* argv[])
     camera = new cCamera(world);
     world->addChild(camera);
 
-    cameraPos = cVector3d(0.0, 0.5, 0.8);
+    cameraPos = cVector3d(0.0, 0.8, 1.0);
     cameraLookAt = cVector3d(0.0, 0.0, 0.3);
 
     // position and orient the camera
@@ -396,7 +367,7 @@ int main(int argc, char* argv[])
     if (hapticDeviceInfo.m_sensedRotation == true)
     {
         // display reference frame
-        device->setShowFrame(true);
+        device->setShowFrame(false);
 
         // set the size of the reference frame
         device->setFrameSize(0.05);
@@ -429,14 +400,86 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     // COMPOSE THE VIRTUAL SCENE
     //-----------------------------------------------------------------------
+    
+    //-----------------------------------------------------------------------
+    // create table mesh
+    //-----------------------------------------------------------------------
 
-    // create a world which supports deformable object
-    defWorld = new cGELWorld();
-    world->addChild(defWorld);
+    float toolRadius = 0.1;
+    double maxStiffness = hapticDeviceInfo.m_maxLinearStiffness / workspaceScaleFactor;
 
-    // modify from here 
+    tableObject = new cMesh();
 
-    // create a mesh
+    // create plane
+
+    // create three new vertices
+    int vertex0 = tableObject->newVertex();
+    int vertex1 = tableObject->newVertex();
+    int vertex2 = tableObject->newVertex();
+    int vertex3 = tableObject->newVertex();
+
+    // set position of each vertex
+    tableObject->m_vertices->setLocalPos(vertex0, -1.0, 0.0, -1.0);
+    tableObject->m_vertices->setTexCoord(vertex0, 0.0, 0.0);
+
+    tableObject->m_vertices->setLocalPos(vertex1, 1.0, 0.0, -1.0);
+    tableObject->m_vertices->setTexCoord(vertex1, 1.0, 0.0);
+
+    tableObject->m_vertices->setLocalPos(vertex2, 1.0, 0.0, 1.0);
+    tableObject->m_vertices->setTexCoord(vertex2, 1.0, 1.0);
+
+    tableObject->m_vertices->setLocalPos(vertex3, -1.0, 0.0, 1.0);
+    tableObject->m_vertices->setTexCoord(vertex3, 0.0, 1.0);
+
+    // create new triangle from vertices
+    tableObject->newTriangle(vertex0, vertex1, vertex2);
+    tableObject->newTriangle(vertex0, vertex2, vertex3);
+
+    // create collision detector
+    tableObject->createAABBCollisionDetector(toolRadius);
+
+    world->addChild(tableObject);
+
+    // set the position of the object at the center of the world
+    tableObject->setLocalPos(0.0, tableHeight, 0.0);
+
+    // set graphic properties
+    bool fileload;
+    tableObject->m_texture = cTexture2d::create();
+    fileload = tableObject->m_texture->loadFromFile(RESOURCE_PATH("../resources/images/brownboard.jpg"));
+    if (!fileload)
+    {
+#if defined(_MSVC)
+        fileload = tableObject->m_texture->loadFromFile("../../../bin/resources/images/brownboard.jpg");
+#endif
+    }
+    if (!fileload)
+    {
+        cout << "Error - Texture image failed to load correctly." << endl;
+        close();
+        return (-1);
+    }
+
+    // enable texture mapping
+    tableObject->setUseTexture(true);
+    tableObject->m_material->setWhite();
+
+    // create normal map from texture data
+    cNormalMapPtr normalMap = cNormalMap::create();
+    normalMap->createMap(tableObject->m_texture);
+    tableObject->m_normalMap = normalMap;
+
+    // set haptic properties
+    tableObject->m_material->setStiffness(0.3 * maxStiffness);
+    tableObject->m_material->setStaticFriction(0.2);
+    tableObject->m_material->setDynamicFriction(0.2);
+    tableObject->m_material->setTextureLevel(0.2);
+    tableObject->m_material->setHapticTriangleSides(true, false);
+
+    //-----------------------------------------------------------------------
+    // create untouchable cloth mesh
+    //-----------------------------------------------------------------------
+    
     clothObject = new cMesh();
     world->addChild(clothObject);
 
@@ -482,10 +525,15 @@ int main(int argc, char* argv[])
 
     // we indicate that we ware rendering triangles by using specific colors for each of them (see above)
     clothObject->setUseVertexColors(true);
-
-    //////////////////////////////////////////////////////////////////////////////////
-
+    
+    //-----------------------------------------------------------------------
+    // create a world which supports deformable object &
     // create a deformable mesh
+    //-----------------------------------------------------------------------
+    
+    defWorld = new cGELWorld();
+    world->addChild(defWorld);
+
     defObject = new cGELMesh();
     defWorld->m_gelMeshes.push_front(defObject);
 
@@ -497,11 +545,9 @@ int main(int argc, char* argv[])
     cGELSkeletonNode::s_default_kDampingPos = 2.5;
     cGELSkeletonNode::s_default_kDampingRot = 0.6;
     cGELSkeletonNode::s_default_mass = 0.0002; // [kg]
-    cGELSkeletonLink::s_default_color.setBrown();
+    cGELSkeletonLink::s_default_color.setBlueAqua();
     cGELSkeletonNode::s_default_showFrame = false;
-    //cGELSkeletonNode::s_default_color.setBlueCornflower();
 
-    //cGELSkeletonLink::s_default_color.set(0.2, 0.2, 1.0);
     cGELSkeletonNode::s_default_useGravity = true;
     cGELSkeletonNode::s_default_gravity.set(0.00, -9.81, 0.00);
     modelRadius = cGELSkeletonNode::s_default_radius;
@@ -518,7 +564,6 @@ int main(int argc, char* argv[])
             //std::cout << "R: " << newNode->m_color.getR() << std::endl;
             defObject->m_nodes.push_front(newNode);
             newNode->m_pos.set((-0.4 + 0.04 * (double)x), -0.2, (-0.4 + 0.04 * (double)y));
-            newNode->m_color.set(1.0, 0.0, 0.0, 0.0f);
             nodes[x][y] = newNode;
         }
     }
@@ -531,8 +576,8 @@ int main(int argc, char* argv[])
 
     // set default physical properties for links
     cGELSkeletonLink::s_default_kSpringElongation = 25.0;  // [N/m]
-    cGELSkeletonLink::s_default_kSpringFlexion = 0.00005;   // [Nm/RAD]
-    cGELSkeletonLink::s_default_kSpringTorsion = 0.1;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringFlexion = 0.000005;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringTorsion = 0.5;   // [Nm/RAD]
 
     // create links between nodes
     for (int y = 0; y < 20; y++)
@@ -555,8 +600,6 @@ int main(int argc, char* argv[])
 
     // show/hide underlying dynamic skeleton model
     defObject->m_showSkeletonModel = true;
-
-    // modify until here 
 
     //--------------------------------------------------------------------------
     // WIDGETS
@@ -640,24 +683,6 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
         return;
     }
 
-    // option - exit
-    else if ((a_key == GLFW_KEY_ESCAPE) || (a_key == GLFW_KEY_Q))
-    {
-        glfwSetWindowShouldClose(a_window, GLFW_TRUE);
-    }
-
-    // option - show/hide skeleton
-    else if (a_key == GLFW_KEY_K)
-    {
-        defObject->m_showSkeletonModel = !defObject->m_showSkeletonModel;
-    }
-
-    else if (a_key == GLFW_KEY_L)
-    {
-        //bool useWireMode = !polygonObject->getWireMode();
-        //polygonObject->setWireMode(useWireMode);
-    }
-
     if (a_key == GLFW_KEY_W) {
         cameraPos.z(cameraPos.z() - 0.1);
         cameraLookAt.z(cameraLookAt.z() - 0.1);
@@ -693,8 +718,26 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
             cameraLookAt,    // look at position (target)
             cVector3d(0.0, 1.0, 0.0));
     }
-    if (a_key == GLFW_KEY_R) {
-        renderCloth = !renderCloth;
+
+    // option - exit
+    else if ((a_key == GLFW_KEY_ESCAPE) || (a_key == GLFW_KEY_Q))
+    {
+        glfwSetWindowShouldClose(a_window, GLFW_TRUE);
+    }
+
+    // option - show/hide skeleton
+    else if (a_key == GLFW_KEY_K)
+    {
+        defObject->m_showSkeletonModel = !defObject->m_showSkeletonModel;
+    }
+
+    else if (a_key == GLFW_KEY_L) {
+        bool useWireMode = !clothObject->getWireMode();
+        clothObject->setWireMode(useWireMode);
+        if (useWireMode)
+            cout << "> Wire mode enabled  \r";
+        else
+            cout << "> Wire mode disabled \r";
     }
     // option - toggle fullscreen
     else if (a_key == GLFW_KEY_F)
@@ -731,10 +774,6 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
         mirroredDisplay = !mirroredDisplay;
         camera->setMirrorVertical(mirroredDisplay);
     }
-    else if (a_key == GLFW_KEY_P)
-    {
-        bDrawPoints = !bDrawPoints;
-    }
 }
 
 void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -761,11 +800,7 @@ void close(void)
 
     // clear graphics simulation
     X.clear();
-    V.clear();
-    F.clear();
-
     indices.clear();
-    springs.clear();
 }
 
 //------------------------------------------------------------------------------
@@ -857,8 +892,14 @@ void updateHaptics(void)
                 cVector3d nodePos = nodes[x][y]->m_pos;
                 cVector3d f = computeForce(pos, deviceRadius, nodePos, modelRadius, stiffness);
                 cVector3d tmpfrc = -1.0 * f;
+
+                if (nodePos.get(1) - tableHeight < 0)
+                    std::cout << cGELSkeletonLink::s_default_kSpringElongation * (tableHeight - nodePos.get(1)) << std::endl;
+                if (nodePos.get(1) - tableHeight < 0) {
+                    tmpfrc.y(tmpfrc.get(1) + 
+                        cGELSkeletonLink::s_default_kSpringElongation * (tableHeight - nodePos.get(1)));
+                }
                 nodes[x][y]->setExternalForce(tmpfrc);
-                force.add(f);
 
                 X[y * 21 + x].x = nodePos.x();
                 X[y * 21 + x].y = nodePos.y()+0.01;
@@ -866,7 +907,7 @@ void updateHaptics(void)
             }
         }
 
-        //// integrate dynamics
+        // integrate dynamics
         defWorld->updateDynamics(time);
 
         //// scale force
@@ -875,12 +916,29 @@ void updateHaptics(void)
         //// send forces to haptic device
         hapticDevice->setForce(force);
 
+        /* triangle objects */
+        // compute global reference frames for each object
+        world->computeGlobalPositions(true);
+
+        // update position and orientation of tool
+        //tool->updateFromDevice();
+
+        //// compute interaction forces
+        //tool->computeInteractionForces();
+
+        //// send forces to haptic device
+        //tool->applyToDevice();
+
+
         // signal frequency counter
         freqCounterHaptics.signal(1);
     }
 
     // exit haptics thread
     simulationFinished = true;
+}
+
+void clothTableCollision() {
 }
 
 //---------------------------------------------------------------------------
