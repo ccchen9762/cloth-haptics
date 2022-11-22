@@ -7,6 +7,7 @@
 
 //------------------------------------------------------------------------------
 #include "cloth.h"
+#include <GLFW/glfw3.h>
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -99,7 +100,7 @@ int swapInterval = 1;
 cGELWorld* defWorld;
 
 // object mesh
-cMesh* object;
+cMesh* clothObject;
 cGELMesh* defObject;
 
 // dynamic nodes
@@ -181,6 +182,7 @@ extern float fRadius;
 extern glm::vec3 center; //object space center of ellipsoid
 //float radius = 1;      //object space radius of ellipsoid
 
+bool renderCloth = false;
 
 //------------------------------------------------------------------------------
 // DECLARED CHAI3D FUNCTIONS
@@ -434,15 +436,15 @@ int main(int argc, char* argv[])
 
     // modify from here 
 
-    // create a deformable mesh
-    object = new cMesh();
-    world->addChild(object);
+    // create a mesh
+    clothObject = new cMesh();
+    world->addChild(clothObject);
 
     // set the position of the object at the center of the world
-    object->setLocalPos(0.0, 0.0, 0.0);
+    clothObject->setLocalPos(0.0, 0.0, 0.0);
 
     // Since we want to see our polygons from both sides, we disable culling.
-    object->setUseCulling(false);
+    clothObject->setUseCulling(false);
 
     initCloth();
 
@@ -454,32 +456,34 @@ int main(int argc, char* argv[])
 
         // define a triangle color
         cColorf color;
-        color.set((X[indices[i + 0]].x+1)*0.5, (X[indices[i + 0]].z+1)*0.5, 0.5);
+        color.set((X[indices[i + 0]].x + 1) * 0.5, (X[indices[i + 0]].z + 1) * 0.5, 0.5);
 
         // create three new vertices
-        int vertex0 = object->newVertex();
-        int vertex1 = object->newVertex();
-        int vertex2 = object->newVertex();
+        int vertex0 = clothObject->newVertex();
+        int vertex1 = clothObject->newVertex();
+        int vertex2 = clothObject->newVertex();
 
         // set position of each vertex
-        object->m_vertices->setLocalPos(vertex0, p0);
-        object->m_vertices->setLocalPos(vertex1, p1);
-        object->m_vertices->setLocalPos(vertex2, p2);
+        clothObject->m_vertices->setLocalPos(vertex0, p0);
+        clothObject->m_vertices->setLocalPos(vertex1, p1);
+        clothObject->m_vertices->setLocalPos(vertex2, p2);
 
         // assign color to each vertex
-        object->m_vertices->setColor(vertex0, color);
-        object->m_vertices->setColor(vertex1, color);
-        object->m_vertices->setColor(vertex2, color);
+        clothObject->m_vertices->setColor(vertex0, color);
+        clothObject->m_vertices->setColor(vertex1, color);
+        clothObject->m_vertices->setColor(vertex2, color);
 
         // create new triangle from vertices
-        object->newTriangle(vertex0, vertex1, vertex2);
+        clothObject->newTriangle(vertex0, vertex1, vertex2);
     }
 
     // compute surface normals
-    object->computeAllNormals();
+    clothObject->computeAllNormals();
 
     // we indicate that we ware rendering triangles by using specific colors for each of them (see above)
-    object->setUseVertexColors(true);
+    clothObject->setUseVertexColors(true);
+
+    //////////////////////////////////////////////////////////////////////////////////
 
     // create a deformable mesh
     defObject = new cGELMesh();
@@ -493,9 +497,11 @@ int main(int argc, char* argv[])
     cGELSkeletonNode::s_default_kDampingPos = 2.5;
     cGELSkeletonNode::s_default_kDampingRot = 0.6;
     cGELSkeletonNode::s_default_mass = 0.0002; // [kg]
-    cGELSkeletonNode::s_default_showFrame = true;
+    cGELSkeletonLink::s_default_color.setBrown();
+    cGELSkeletonNode::s_default_showFrame = false;
     //cGELSkeletonNode::s_default_color.setBlueCornflower();
-    cGELSkeletonLink::s_default_color.set(0.2, 0.2, 1.0);
+
+    //cGELSkeletonLink::s_default_color.set(0.2, 0.2, 1.0);
     cGELSkeletonNode::s_default_useGravity = true;
     cGELSkeletonNode::s_default_gravity.set(0.00, -9.81, 0.00);
     modelRadius = cGELSkeletonNode::s_default_radius;
@@ -509,11 +515,11 @@ int main(int argc, char* argv[])
         for (int x = 0; x < 21; x++)
         {
             cGELSkeletonNode* newNode = new cGELSkeletonNode();
-            newNode->m_color.set(0.1, 0.1, 0.1);
-            std::cout << "R: " << newNode->m_color.getR() << std::endl;
-            nodes[x][y] = newNode;
+            //std::cout << "R: " << newNode->m_color.getR() << std::endl;
             defObject->m_nodes.push_front(newNode);
             newNode->m_pos.set((-0.4 + 0.04 * (double)x), -0.2, (-0.4 + 0.04 * (double)y));
+            newNode->m_color.set(1.0, 0.0, 0.0, 0.0f);
+            nodes[x][y] = newNode;
         }
     }
 
@@ -525,9 +531,8 @@ int main(int argc, char* argv[])
 
     // set default physical properties for links
     cGELSkeletonLink::s_default_kSpringElongation = 25.0;  // [N/m]
-    cGELSkeletonLink::s_default_kSpringFlexion = 0.00001;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringFlexion = 0.00005;   // [Nm/RAD]
     cGELSkeletonLink::s_default_kSpringTorsion = 0.1;   // [Nm/RAD]
-    cGELSkeletonLink::s_default_color.setBlueCornflower();
 
     // create links between nodes
     for (int y = 0; y < 20; y++)
@@ -546,7 +551,7 @@ int main(int argc, char* argv[])
     }
 
     // connect skin (mesh) to skeleton (GEM)
-    defObject->connectVerticesToSkeleton(false);
+    defObject->connectVerticesToSkeleton(true);
 
     // show/hide underlying dynamic skeleton model
     defObject->m_showSkeletonModel = true;
@@ -649,8 +654,8 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
 
     else if (a_key == GLFW_KEY_L)
     {
-        bool useWireMode = !object->getWireMode();
-        object->setWireMode(useWireMode);
+        //bool useWireMode = !polygonObject->getWireMode();
+        //polygonObject->setWireMode(useWireMode);
     }
 
     if (a_key == GLFW_KEY_W) {
@@ -688,7 +693,9 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
             cameraLookAt,    // look at position (target)
             cVector3d(0.0, 1.0, 0.0));
     }
-
+    if (a_key == GLFW_KEY_R) {
+        renderCloth = !renderCloth;
+    }
     // option - toggle fullscreen
     else if (a_key == GLFW_KEY_F)
     {
@@ -792,6 +799,15 @@ void updateGraphics(void)
 
     // render cloth
     //drawGrid();
+    for (int i = 0; i < clothObject->getNumVertices(); i+=3) {
+        cVector3d p0 = cVector3d(X[indices[i + 0]].x, X[indices[i + 0]].y, X[indices[i + 0]].z);
+        cVector3d p1 = cVector3d(X[indices[i + 1]].x, X[indices[i + 1]].y, X[indices[i + 1]].z);
+        cVector3d p2 = cVector3d(X[indices[i + 2]].x, X[indices[i + 2]].y, X[indices[i + 2]].z);
+
+        clothObject->m_vertices->setLocalPos(i, p0);
+        clothObject->m_vertices->setLocalPos(i+1, p1);
+        clothObject->m_vertices->setLocalPos(i+2, p2);
+    }
 
     // wait until all GL commands are completed
     glFinish();
@@ -834,15 +850,19 @@ void updateHaptics(void)
 
         // compute reaction forces
         cVector3d force(0.0, 0.0, 0.0);
-        for (int y = 0; y < 10; y++)
+        for (int y = 0; y < 21; y++)
         {
-            for (int x = 0; x < 10; x++)
+            for (int x = 0; x < 21; x++)
             {
                 cVector3d nodePos = nodes[x][y]->m_pos;
                 cVector3d f = computeForce(pos, deviceRadius, nodePos, modelRadius, stiffness);
                 cVector3d tmpfrc = -1.0 * f;
                 nodes[x][y]->setExternalForce(tmpfrc);
                 force.add(f);
+
+                X[y * 21 + x].x = nodePos.x();
+                X[y * 21 + x].y = nodePos.y()+0.01;
+                X[y * 21 + x].z = nodePos.z();
             }
         }
 
@@ -861,65 +881,6 @@ void updateHaptics(void)
 
     // exit haptics thread
     simulationFinished = true;
-
-
-    // initialize frequency counter
-    //frequencyCounter.reset();
-
-    //// simulation in now running
-    //simulationRunning = true;
-    //simulationFinished = false;
-
-    //// main haptic simulation loop
-    //while (simulationRunning)
-    //{
-    //    /////////////////////////////////////////////////////////////////////
-    //    // READ HAPTIC DEVICE
-    //    /////////////////////////////////////////////////////////////////////
-
-    //    // read position 
-    //    cVector3d position;
-    //    hapticDevice->getPosition(position);
-
-    //    // read orientation 
-    //    cMatrix3d rotation;
-    //    hapticDevice->getRotation(rotation);
-
-    //    // read user-switch status (button 0)
-    //    bool button = false;
-    //    hapticDevice->getUserSwitch(0, button);
-
-
-    //    /////////////////////////////////////////////////////////////////////
-    //    // UPDATE 3D CURSOR MODEL
-    //    /////////////////////////////////////////////////////////////////////
-
-    //    // update position and orienation of cursor
-    //    device->setLocalPos(position);
-    //    device->setLocalRot(rotation);
-
-    //    /////////////////////////////////////////////////////////////////////
-    //    // COMPUTE FORCES
-    //    /////////////////////////////////////////////////////////////////////
-
-    //    cVector3d force(0, 0, 0);
-    //    cVector3d torque(0, 0, 0);
-    //    double gripperForce = 0.0;
-
-
-    //    /////////////////////////////////////////////////////////////////////
-    //    // APPLY FORCES
-    //    /////////////////////////////////////////////////////////////////////
-
-    //    // send computed force, torque, and gripper force to haptic device
-    //    hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
-
-    //    // update frequency counter
-    //    frequencyCounter.signal(1);
-    //}
-
-    //// exit haptics thread
-    //simulationFinished = true;
 }
 
 //---------------------------------------------------------------------------
@@ -962,15 +923,12 @@ void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a
     double x, y;
     glfwGetCursorPos(window, &x, &y);
 
-    
-
     if (a_button == GLFW_MOUSE_BUTTON_LEFT && a_action == GLFW_PRESS)
     {
         if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
             std::cout << "l press" << std::endl;
         }
 
-        
         oldX = x;
         oldY = y;
         int window_y = (windowHeight - y);
@@ -999,151 +957,4 @@ void mouseButtonCallback(GLFWwindow* a_window, int a_button, int a_action, int a
         glfwSetCursorPos(window, x, y);
     }
 }
-
-//void onMouseDown(int button, int s, int x, int y)
-//{
-//    if (s == GLUT_DOWN)
-//    {
-//        oldX = x;
-//        oldY = y;
-//        int window_y = (windowH - y);
-//        float norm_y = float(window_y) / float(windowH / 2.0);
-//        int window_x = x;
-//        float norm_x = float(window_x) / float(windowW / 2.0);
-//
-//        float winZ = 0;
-//        glReadPixels(x, windowH - y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
-//        if (winZ == 1)
-//            winZ = 0;
-//        double objX = 0, objY = 0, objZ = 0;
-//        gluUnProject(window_x, window_y, winZ, MV, P, viewport, &objX, &objY, &objZ);
-//        glm::vec3 pt(objX, objY, objZ);
-//        size_t i = 0;
-//        for (i = 0; i < total_points; i++) {
-//            if (glm::distance(X[i], pt) < 0.1) {
-//                selected_index = i;
-//                printf("Intersected at %d\n", i);
-//                break;
-//            }
-//        }
-//    }
-//
-//    if (button == GLUT_MIDDLE_BUTTON)
-//        state = 0;
-//    else
-//        state = 1;
-//
-//    if (s == GLUT_UP) {
-//        selected_index = -1;
-//        glutSetCursor(GLUT_CURSOR_INHERIT);
-//    }
-//}
-
-//------------------------------------------------------------------------------
-
-//void onMouseMove(int x, int y)
-//{
-//    if (selected_index == -1) {
-//        if (state == 0)
-//            dist *= (1 + (y - oldY) / 60.0f);
-//        else
-//        {
-//            rY += (x - oldX) / 5.0f;
-//            rX += (y - oldY) / 5.0f;
-//        }
-//    }
-//    else {
-//        float delta = 1500 / abs(dist);
-//        float valX = (x - oldX) / delta;
-//        float valY = (oldY - y) / delta;
-//        if (abs(valX) > abs(valY))
-//            glutSetCursor(GLUT_CURSOR_LEFT_RIGHT);
-//        else
-//            glutSetCursor(GLUT_CURSOR_UP_DOWN);
-//        V[selected_index] = glm::vec3(0);
-//        X[selected_index].x += Right[0] * valX;
-//        float newValue = X[selected_index].y + Up[1] * valY;
-//        if (newValue > 0)
-//            X[selected_index].y = newValue;
-//        X[selected_index].z += Right[2] * valX + Up[2] * valY;
-//
-//        //V[selected_index].x = 0;
-//        //V[selected_index].y = 0;
-//        //V[selected_index].z = 0;
-//    }
-//    oldX = x;
-//    oldY = y;
-//
-//    glutPostRedisplay();
-//}
-
-
-
-////------------------------------------------------------------------------------
-//
-//void onRender() {
-//    size_t i = 0;
-//    float newTime = (float)glutGet(GLUT_ELAPSED_TIME);
-//    frameTime = newTime - currentTime;
-//    currentTime = newTime;
-//    //accumulator += frameTime;
-//
-//    //Using high res. counter
-//    QueryPerformanceCounter(&t2);
-//    // compute and print the elapsed time in millisec
-//    frameTimeQP = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
-//    t1 = t2;
-//    accumulator += frameTimeQP;
-//
-//    ++totalFrames;
-//    if ((newTime - startTime) > 1000)
-//    {
-//        float elapsedTime = (newTime - startTime);
-//        fps = (totalFrames / elapsedTime) * 1000;
-//        startTime = newTime;
-//        totalFrames = 0;
-//    }
-//
-//    //sprintf_s(info, "FPS: %3.2f, Frame time (GLUT): %3.4f msecs, Frame time (QP): %3.3f", fps, frameTime, frameTimeQP);
-//    //glutSetWindowTitle(info);
-//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//    glLoadIdentity();
-//    glTranslatef(0, 0, dist);
-//    glRotatef(rX, 1, 0, 0);
-//    glRotatef(rY, 0, 1, 0);
-//
-//    glGetDoublev(GL_MODELVIEW_MATRIX, MV);
-//    viewDir.x = (float)-MV[2];
-//    viewDir.y = (float)-MV[6];
-//    viewDir.z = (float)-MV[10];
-//    Right = glm::cross(viewDir, Up);
-//
-//    //draw grid
-//    drawGrid();
-//
-//    //draw polygons
-//    glColor3f(1, 1, 1);
-//    glBegin(GL_TRIANGLES);
-//    for (i = 0; i < indices.size(); i += 3) {
-//        glm::vec3 p1 = X[indices[i]];
-//        glm::vec3 p2 = X[indices[i + 1]];
-//        glm::vec3 p3 = X[indices[i + 2]];
-//        glVertex3f(p1.x, p1.y, p1.z);
-//        glVertex3f(p2.x, p2.y, p2.z);
-//        glVertex3f(p3.x, p3.y, p3.z);
-//    }
-//    glEnd();
-//
-//    //draw points
-//    if (bDrawPoints) {
-//        glBegin(GL_POINTS);
-//        for (i = 0; i < total_points; i++) {
-//            glm::vec3 p = X[i];
-//            int is = (i == selected_index);
-//            glColor3f((float)!is, (float)is, (float)is);
-//            glVertex3f(p.x, p.y, p.z);
-//        }
-//        glEnd();
-//    }
-//}
 

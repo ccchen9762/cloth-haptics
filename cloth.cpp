@@ -68,105 +68,40 @@ float fRadius = 1;
 
 // Resolve constraint in object space
 glm::vec3 center = glm::vec3(0, 0, 0); //object space center of ellipsoid
-//float radius = 1;                    //object space radius of ellipsoid
 
 //------------------------------------------------------------------------------
 
-void stepPhysics(float dt) {
-    computeForces();
+void drawGrid()
+{
+    //std::cout << "aiwjeofaiwjeoif" << std::endl;
+    glEnable(GL_DEPTH_TEST);
+    glBegin(GL_LINES);
+    glColor3f(0.5f, 0.5f, 0.5f);
+    for (int i = -GRID_SIZE; i <= GRID_SIZE; i++)
+    {
+        glVertex3f((float)i, 0, (float)-GRID_SIZE);
+        glVertex3f((float)i, 0, (float)GRID_SIZE);
 
-    //for Explicit Euler
-    integrateEuler(dt);
-
-    applyProvotDynamicInverse();
-}
-
-//------------------------------------------------------------------------------
-
-void computeForces() {
-    size_t i = 0;
-    /*std::cout << "points " << total_points << std::endl;
-    std::cout << "x " << numX << std::endl;*/
-    for (i = 0; i < total_points; i++) {
-        F[i] = glm::vec3(0);
-
-        //add gravity force only for non-fixed points
-        if (i != 0 && i != numX && i != 440 && i != 420)
-            F[i] += gravity;
-
-        //add force due to damping of velocity
-
-        F[i] += DEFAULT_DAMPING * V[i];
+        glVertex3f((float)-GRID_SIZE, 0, (float)i);
+        glVertex3f((float)GRID_SIZE, 0, (float)i);
     }
+    glEnd();
 
-    //add spring forces
-    for (i = 0; i < springs.size(); i++) {
-        glm::vec3 p1 = X[springs[i].p1];
-        glm::vec3 p2 = X[springs[i].p2];
-        glm::vec3 v1 = V[springs[i].p1];
-        glm::vec3 v2 = V[springs[i].p2];
-        glm::vec3 deltaP = p1 - p2;
-        glm::vec3 deltaV = v1 - v2;
-        float dist = glm::length(deltaP);
-
-        float leftTerm = -springs[i].Ks * (dist - springs[i].rest_length);
-        float rightTerm = springs[i].Kd * (glm::dot(deltaV, deltaP) / dist);
-        glm::vec3 springForce = (leftTerm + rightTerm) * glm::normalize(deltaP);
-
-        if (springs[i].p1 != 0 && springs[i].p1 != numX && springs[i].p1 != 440 && springs[i].p1 != 420)
-            F[springs[i].p1] += springForce;
-        if (springs[i].p2 != 0 && springs[i].p2 != numX && springs[i].p2 != 440 && springs[i].p2 != 420)
-            F[springs[i].p2] -= springForce;
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glBegin(GL_TRIANGLES);
+    int i = 0, j = 0, count = 0;
+    int l1 = 0, l2 = 0;
+    float ypos = 7.0f;
+    int v = numY + 1;
+    int u = numX + 1;
+    glColor3f(1.0f, 1.0f, 1.0f);
+    for (int i = 0; i < indices.size(); i += 3) {
+        // define triangle points
+        glVertex3f(X[indices[i + 0]].x, X[indices[i + 0]].y, X[indices[i + 0]].z);
+        glVertex3f(X[indices[i + 1]].x, X[indices[i + 1]].y, X[indices[i + 1]].z);
+        glVertex3f(X[indices[i + 2]].x, X[indices[i + 2]].y, X[indices[i + 2]].z);
     }
-}
-
-//------------------------------------------------------------------------------
-
-void integrateEuler(float deltaTime) {
-    float deltaTimeMass = deltaTime / mass;
-    size_t i = 0;
-
-    for (i = 0; i < total_points; i++) {
-        glm::vec3 oldV = V[i];
-
-        if (i != 0 && i != numX && i != 440 && i != 420) {
-            V[i] += (F[i] * deltaTimeMass);
-            X[i] += deltaTime * oldV;
-        }
-
-        if (X[i].y < 0) {
-            X[i].y = 0;
-        }
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void applyProvotDynamicInverse() {
-
-    for (size_t i = 0; i < springs.size(); i++) {
-        //check the current lengths of all springs
-        glm::vec3 p1 = X[springs[i].p1];
-        glm::vec3 p2 = X[springs[i].p2];
-        glm::vec3 deltaP = p1 - p2;
-        float dist = glm::length(deltaP);
-        if (dist > springs[i].rest_length) {
-            dist -= (springs[i].rest_length);
-            dist /= 2.0f;
-            deltaP = glm::normalize(deltaP);
-            deltaP *= dist;
-            if (springs[i].p1 == 0 || springs[i].p1 == numX || springs[i].p1 == 440 || springs[i].p1 == 420) {
-                V[springs[i].p2] += deltaP;
-            }
-            else if (springs[i].p2 == 0 || springs[i].p2 == numX || springs[i].p2 == 440 || springs[i].p2 == 420) {
-                V[springs[i].p1] -= deltaP;
-            }
-            else {
-                V[springs[i].p1] -= deltaP;
-                V[springs[i].p2] += deltaP;
-            }
-        }
-    }
+    glEnd();
 }
 
 //------------------------------------------------------------------------------
@@ -183,34 +118,7 @@ void addSpring(int a, int b, float ks, float kd, int type) {
     springs.push_back(spring);
 }
 
-//------------------------------------------------------------------------------
-
-void drawGrid()
-{
-    glBegin(GL_LINES);
-    glColor3f(0.5f, 0.5f, 0.5f);
-    for (int i = -GRID_SIZE; i <= GRID_SIZE; i++)
-    {
-        glVertex3f((float)i, 0, (float)-GRID_SIZE);
-        glVertex3f((float)i, 0, (float)GRID_SIZE);
-
-        glVertex3f((float)-GRID_SIZE, 0, (float)i);
-        glVertex3f((float)GRID_SIZE, 0, (float)i);
-    }
-    glEnd();
-}
-
-//------------------------------------------------------------------------------
-
 void initCloth() {
-    startTime = (float)glfwGetTime();
-    currentTime = startTime;
-
-    // get ticks per second
-    QueryPerformanceFrequency(&frequency);
-
-    // start timer
-    QueryPerformanceCounter(&t1);
 
     glEnable(GL_DEPTH_TEST);
     int i = 0, j = 0, count = 0;
@@ -253,6 +161,7 @@ void initCloth() {
         }
     }
 
+    glEnable(GL_DEPTH_TEST);
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     glPointSize(5);
 

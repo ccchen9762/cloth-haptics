@@ -20,23 +20,8 @@ struct Spring {
 // DECLARED GRAPHICS FUNCTIONS
 //------------------------------------------------------------------------------
 
-// move to next state
-void stepPhysics(float dt);
-
-// add spring to the grid
-void addSpring(int a, int b, float ks, float kd, int type);
-
 // draw lines of the grid
 void drawGrid();
 
 // initialize scene
 void initCloth();
-
-// compute current forces
-void computeForces();
-
-// discrete step with euler
-void integrateEuler(float deltaTime);
-
-// apply dynamic inverse
-void applyProvotDynamicInverse();
