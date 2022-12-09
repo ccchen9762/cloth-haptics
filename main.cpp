@@ -354,6 +354,13 @@ int main(int argc, char* argv[])
     // retrieve information about the current haptic device
     cHapticDeviceInfo hapticDeviceInfo = hapticDevice->getSpecifications();
 
+    // create a 3D tool and add it to the world
+    //tool = new cToolCursor(world);
+    //camera->addChild(tool);
+
+    // connect the haptic device to the tool
+    //tool->setHapticDevice(hapticDevice);
+
     // open a connection to haptic device
     hapticDevice->open();
 
@@ -541,10 +548,10 @@ int main(int argc, char* argv[])
     defObject->buildVertices();
 
     // set default properties for skeleton nodes
-    cGELSkeletonNode::s_default_radius = 0.02;  // [m]
-    cGELSkeletonNode::s_default_kDampingPos = 2.5;
+    cGELSkeletonNode::s_default_radius = 0.018;  // [m]
+    cGELSkeletonNode::s_default_kDampingPos = 10.0;
     cGELSkeletonNode::s_default_kDampingRot = 0.6;
-    cGELSkeletonNode::s_default_mass = 0.0002; // [kg]
+    cGELSkeletonNode::s_default_mass = 0.0004; // [kg]
     cGELSkeletonLink::s_default_color.setBlueAqua();
     cGELSkeletonNode::s_default_showFrame = false;
 
@@ -893,6 +900,10 @@ void updateHaptics(void)
                 cVector3d f = computeForce(pos, deviceRadius, nodePos, modelRadius, stiffness);
                 cVector3d tmpfrc = -1.0 * f;
 
+                X[y * 21 + x].x = nodePos.x();
+                X[y * 21 + x].y = nodePos.y() + 0.01;
+                X[y * 21 + x].z = nodePos.z();
+
                 if (nodePos.get(1) - tableHeight < 0)
                     std::cout << cGELSkeletonLink::s_default_kSpringElongation * (tableHeight - nodePos.get(1)) << std::endl;
                 if (nodePos.get(1) - tableHeight < 0) {
@@ -900,10 +911,7 @@ void updateHaptics(void)
                         cGELSkeletonLink::s_default_kSpringElongation * (tableHeight - nodePos.get(1)));
                 }
                 nodes[x][y]->setExternalForce(tmpfrc);
-
-                X[y * 21 + x].x = nodePos.x();
-                X[y * 21 + x].y = nodePos.y()+0.01;
-                X[y * 21 + x].z = nodePos.z();
+                force.add(f);
             }
         }
 
