@@ -22,12 +22,12 @@ ChaiWorld::ChaiWorld() {
     m_world->addChild(m_camera);
 
     // position and orient the camera
-    m_camera->set(chai3d::cVector3d(5.0, 0.0, 0.5),    // camera position (eye)
-        chai3d::cVector3d(0.0, 0.0, 0.0),    // look at position (target)
+    m_camera->set(chai3d::cVector3d(3.0, 0.0, 0.5),    // camera position (eye)
+        chai3d::cVector3d(-2.0, 0.0, 0.0),    // look at position (target)
         chai3d::cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
 
     // set the near and far clipping planes of the camera
-    m_camera->setClippingPlanes(0.01, 100.0);
+    m_camera->setClippingPlanes(0.01, 10.0);    // can be bigger
 
     // set stereo mode
     m_camera->setStereoMode(kStereoMode);
@@ -71,7 +71,7 @@ ChaiWorld::ChaiWorld() {
     m_hapticDevice->open();
 
     // desired workspace radius of the cursor
-    m_cursorWorkspaceRadius = 0.2;
+    m_cursorWorkspaceRadius = 0.7;
 
     // read the scale factor between the physical workspace of the haptic
     // device and the virtual workspace defined for the tool
@@ -85,7 +85,7 @@ ChaiWorld::ChaiWorld() {
     m_deviceForceScale = 5.0;
 
     // create a large sphere that represents the haptic device
-    m_deviceRadius = 0.2;
+    m_deviceRadius = 0.1;
     m_device = new chai3d::cShapeSphere(m_deviceRadius);
     m_world->addChild(m_device);
     m_device->m_material->setWhite();
@@ -94,11 +94,11 @@ ChaiWorld::ChaiWorld() {
 
     //=================for rigid=========================
     // create a 3D tool and add it to the world
-    m_tool = new chai3d::cToolCursor(m_world);
+    /*m_tool = new chai3d::cToolCursor(m_world);
     m_camera->addChild(m_tool);
 
     // position tool in respect to camera
-    m_tool->setLocalPos(-1.0, 0.0, 0.0);
+    m_tool->setLocalPos(0.0, 0.0, 0.0);
 
     // connect the haptic device to the tool
     m_tool->setHapticDevice(m_hapticDevice);
@@ -118,7 +118,7 @@ ChaiWorld::ChaiWorld() {
     m_tool->setWaitForSmallForce(true);
 
     // start the haptic tool
-    m_tool->start();
+    m_tool->start();*/
 
 
 
@@ -143,10 +143,10 @@ void ChaiWorld::attachDeformableObject(Deformable& deformable) {
 
     // set default properties for skeleton nodes
     cGELSkeletonNode::s_default_radius = 0.05;  // [m]
-    cGELSkeletonNode::s_default_kDampingPos = 2.5;
-    cGELSkeletonNode::s_default_kDampingRot = 0.6;
+    cGELSkeletonNode::s_default_kDampingPos = 5.0;  // 2.5
+    cGELSkeletonNode::s_default_kDampingRot = 0.6;  // 0.6
     cGELSkeletonNode::s_default_mass = 0.002; // [kg]
-    cGELSkeletonNode::s_default_showFrame = true;
+    cGELSkeletonNode::s_default_showFrame = false;
     cGELSkeletonNode::s_default_color.setBlueLightSky();
     cGELSkeletonNode::s_default_useGravity = true;
     cGELSkeletonNode::s_default_gravity.set(0.00, 0.00, -9.81);
@@ -198,7 +198,7 @@ void ChaiWorld::attachDeformableObject(Deformable& deformable) {
     }
 
     // connect skin (mesh) to skeleton (GEM)
-    deformable.m_defObject->connectVerticesToSkeleton(true);
+    deformable.m_defObject->connectVerticesToSkeleton(false);
 
     // show/hide underlying dynamic skeleton model
     deformable.m_defObject->m_showSkeletonModel = true;
@@ -275,7 +275,7 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
             //X[y * 21 + x].y = nodePos.y() + 0.01;
             //X[y * 21 + x].z = nodePos.z();
 
-            double modelHeight = cloth->m_modelRadius/2;
+            double modelHeight = cloth->m_modelRadius;
             //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
             //    std::cout << cGELSkeletonLink::s_default_kSpringElongation * (table->getOffset().z() - nodePos.get(2)) << std::endl;
             if (nodePos.get(2) - table->getOffset().z() < modelHeight) {
@@ -283,6 +283,10 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
                     cGELSkeletonLink::s_default_kSpringElongation * (modelHeight + table->getOffset().z() - nodePos.get(2)));
             }
             cloth->m_nodes[i][j]->setExternalForce(tmpfrc);
+            
+            if (pos.get(2) - table->getOffset().z() < m_deviceRadius+0.02)
+                f.z(f.get(2) + 0.3 * (table->getOffset().z()- pos.get(2) + m_deviceRadius+0.02));
+
             force.add(f);
         }
     }
@@ -298,13 +302,13 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
 
     /* triangle objects */
     // compute global reference frames for each object
-    ChaiWorld::chaiWorld.getWorld()->computeGlobalPositions(true);
+    //ChaiWorld::chaiWorld.getWorld()->computeGlobalPositions(true);
 
 
     // for rigids
 
     // compute global reference frames for each object
-    m_world->computeGlobalPositions(true);
+    /*m_world->computeGlobalPositions(true);
 
     // update position and orientation of tool
     m_tool->updateFromDevice();
@@ -313,7 +317,7 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
     m_tool->computeInteractionForces();
 
     // send forces to haptic device
-    m_tool->applyToDevice();
+    m_tool->applyToDevice();*/
 }
 
 chai3d::cVector3d ChaiWorld::computeForce(const chai3d::cVector3d& a_cursor,

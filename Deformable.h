@@ -32,7 +32,7 @@ private:
 	// stiffness properties between the haptic device tool and the model (GEM)
 	double m_stiffness;
 
-	// deformable friction test
+	// deformable friction test?
 	float m_staticFriction;
 	float m_dynamicFriction;
 };

@@ -198,8 +198,8 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     // COMPOSE THE VIRTUAL SCENE
     //-----------------------------------------------------------------------
-    table = new Rigid(4.0, 4.0, chai3d::cVector3d(0.0, 0.0, -0.8), 0.8, 0.3, 0.2, 1.0);
-    cloth = new Deformable(21, 21, chai3d::cVector3d(0.0, 0.0, -0.4));
+    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.4), 0.8, 0.3, 0.2, 1.0);
+    cloth = new Deformable(20, 20, chai3d::cVector3d(-0.5, 0.0, -0.1));
 
     ChaiWorld::chaiWorld.attachRigidObject(*table);
     ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
@@ -322,6 +322,7 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
             std::cout << "> Wire mode disabled \r";*/
         break;
     case GLFW_KEY_F:
+        if (a_action == GLFW_PRESS)
         {
             // toggle state variable
             kFullscreen = !kFullscreen;
