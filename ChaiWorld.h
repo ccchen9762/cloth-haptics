@@ -31,7 +31,7 @@ public:
 	void attachRigidObject(Rigid& rigid);
 
 	// main haptics simulation loop
-	void updateHaptics(double time, Deformable* cloth, Rigid* table);
+	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr);
 	// compute forces between tool and environment
 	chai3d::cVector3d computeForce(const chai3d::cVector3d& a_cursor,
 		double a_cursorRadius,

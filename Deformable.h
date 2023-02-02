@@ -9,8 +9,9 @@ class Deformable
 	friend class ChaiWorld;
 
 public:
-	Deformable(int width, int length, chai3d::cVector3d offset);
-	~Deformable();
+	Deformable(int width, int length, chai3d::cVector3d offset, 
+		double elongation = 25.0, double flexion = 0.5, double torsion = 0.1);
+	~Deformable() = default;
 
 	cGELMesh* getDefObject() { return m_defObject; }
 
@@ -31,6 +32,11 @@ private:
 
 	// stiffness properties between the haptic device tool and the model (GEM)
 	double m_stiffness;
+
+	// spring parameters
+	double m_elongation;
+	double m_flexion;
+	double m_torsion;
 
 	// deformable friction test?
 	float m_staticFriction;

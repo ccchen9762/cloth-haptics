@@ -176,9 +176,9 @@ void ChaiWorld::attachDeformableObject(Deformable& deformable) {
     deformable.m_nodes.back().back()->m_fixed = true;
 
     // set default physical properties for links
-    cGELSkeletonLink::s_default_kSpringElongation = 25.0;  // [N/m]
-    cGELSkeletonLink::s_default_kSpringFlexion = 0.5;   // [Nm/RAD]
-    cGELSkeletonLink::s_default_kSpringTorsion = 0.1;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringElongation = deformable.m_elongation ;  // [N/m]
+    cGELSkeletonLink::s_default_kSpringFlexion = deformable.m_flexion;   // [Nm/RAD]
+    cGELSkeletonLink::s_default_kSpringTorsion = deformable.m_torsion;   // [Nm/RAD]
     cGELSkeletonLink::s_default_color.setWhite();
 
     // create links between nodes
@@ -251,7 +251,7 @@ void ChaiWorld::attachRigidObject(Rigid& rigid) {
     rigid.m_object->m_material->setHapticTriangleSides(true, false);
 }
 
-void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
+void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2) {
     // read position from haptic device
     chai3d::cVector3d pos;
     m_hapticDevice->getPosition(pos);
@@ -288,6 +288,36 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table) {
                 f.z(f.get(2) + 0.3 * (table->getOffset().z()- pos.get(2) + m_deviceRadius+0.02));
 
             force.add(f);
+        }
+    }
+
+    if (cloth2) {
+        for (int i = 0; i < cloth2->m_length; i++)
+        {
+            for (int j = 0; j < cloth2->m_width; j++)
+            {
+                chai3d::cVector3d nodePos = cloth2->m_nodes[i][j]->m_pos;
+                chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth2->m_modelRadius, cloth2->m_stiffness);
+                chai3d::cVector3d tmpfrc = -1.0 * f;
+
+                //X[y * 21 + x].x = nodePos.x();
+                //X[y * 21 + x].y = nodePos.y() + 0.01;
+                //X[y * 21 + x].z = nodePos.z();
+
+                double modelHeight = cloth2->m_modelRadius;
+                //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
+                //    std::cout << cGELSkeletonLink::s_default_kSpringElongation * (table->getOffset().z() - nodePos.get(2)) << std::endl;
+                if (nodePos.get(2) - table->getOffset().z() < modelHeight) {
+                    tmpfrc.z(tmpfrc.get(2) +
+                        cGELSkeletonLink::s_default_kSpringElongation * (modelHeight + table->getOffset().z() - nodePos.get(2)));
+                }
+                cloth2->m_nodes[i][j]->setExternalForce(tmpfrc);
+
+                if (pos.get(2) - table->getOffset().z() < m_deviceRadius + 0.02)
+                    f.z(f.get(2) + 0.3 * (table->getOffset().z() - pos.get(2) + m_deviceRadius + 0.02));
+
+                force.add(f);
+            }
         }
     }
 
@@ -344,8 +374,10 @@ chai3d::cVector3d ChaiWorld::computeForce(const chai3d::cVector3d& a_cursor,
 
     // compute penetration distance between tool and surface of sphere
     double penetrationDistance = (a_cursorRadius + a_radius) - vSphereCursor.length();
+    //std::cout << penetrationDistance << std::endl;
     chai3d::cVector3d forceDirection = cNormalize(vSphereCursor);
     force = chai3d::cMul(penetrationDistance * a_stiffness, forceDirection);
+    // penetrationDistance * penetrationDistance * 50 * a_stiffness, forceDirection ?
 
     // return result
     return (force);

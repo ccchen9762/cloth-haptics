@@ -16,7 +16,7 @@
 
 Rigid* table;
 Deformable* cloth;
-
+Deformable* cloth2;
 
 //------------------------------------------------------------------------------
 // TEXT VARIABLES
@@ -198,11 +198,18 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     // COMPOSE THE VIRTUAL SCENE
     //-----------------------------------------------------------------------
-    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.4), 0.8, 0.3, 0.2, 1.0);
-    cloth = new Deformable(20, 20, chai3d::cVector3d(-0.5, 0.0, -0.1));
+    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.5), 0.8, 0.3, 0.2, 1.0);
+    //texture 1
+    cloth = new Deformable(13, 13, chai3d::cVector3d(-0.5, -1.0, -0.1), 10);
+    //texture 2
+    cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
+    //texture 3
+    //cloth = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 100);
+
 
     ChaiWorld::chaiWorld.attachRigidObject(*table);
     ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
+    ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
 
     //--------------------------------------------------------------------------
     // WIDGETS
@@ -454,7 +461,7 @@ void updateHaptics(void)
         // restart clock
         clock.start(true);
 
-        ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);
+        ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);
 
         // signal frequency counter
         freqCounterHaptics.signal(1);
