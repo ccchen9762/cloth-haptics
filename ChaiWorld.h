@@ -5,6 +5,8 @@
 
 #include "Deformable.h"
 #include "Rigid.h"
+#include "Polygons.h"
+
 
 class ChaiWorld
 {
@@ -29,6 +31,12 @@ public:
 	
 	void attachDeformableObject(Deformable& deformable);
 	void attachRigidObject(Rigid& rigid);
+	void attachPolygons(Polygons& Polygons);
+
+	void cameraMoveForward();
+	void cameraMoveBack();
+	void cameraMoveLeft();
+	void cameraMoveRight();
 
 	// main haptics simulation loop
 	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr);
@@ -49,6 +57,9 @@ private:
 
 	// a camera to render the world in the window display
 	chai3d::cCamera* m_camera;
+
+	chai3d::cVector3d m_cameraPos;
+	chai3d::cVector3d m_cameraLookAt;
 
 	// a light source to illuminate the objects in the world
 	chai3d::cDirectionalLight* m_light;

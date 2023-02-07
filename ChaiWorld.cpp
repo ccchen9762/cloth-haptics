@@ -22,8 +22,11 @@ ChaiWorld::ChaiWorld() {
     m_world->addChild(m_camera);
 
     // position and orient the camera
-    m_camera->set(chai3d::cVector3d(3.0, 0.0, 0.5),    // camera position (eye)
-        chai3d::cVector3d(-2.0, 0.0, 0.0),    // look at position (target)
+    m_cameraPos = chai3d::cVector3d(2.5, 0.0, 0.8);
+    m_cameraLookAt = chai3d::cVector3d(-2.0, 0.0, 0.0);
+
+    m_camera->set(m_cameraPos,    // camera position (eye)
+        m_cameraLookAt,    // look at position (target)
         chai3d::cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
 
     // set the near and far clipping planes of the camera
@@ -249,6 +252,92 @@ void ChaiWorld::attachRigidObject(Rigid& rigid) {
     rigid.m_object->m_material->setDynamicFriction(rigid.m_dynamicFriction);
     rigid.m_object->m_material->setTextureLevel(rigid.m_textureLevel);
     rigid.m_object->m_material->setHapticTriangleSides(true, false);
+}
+
+void ChaiWorld::attachPolygons(Polygons& Polygons) {
+    
+    m_world->addChild(Polygons.m_object);
+
+    // set the position of the object at the center of the world
+    Polygons.m_object->setLocalPos(0.0, 0.0, 0.0);
+
+    // Since we want to see our polygons from both sides, we disable culling.
+    Polygons.m_object->setUseCulling(false);
+
+    for (int i = 0; i < Polygons.m_indices.size(); i += 3) {
+        // define triangle points
+        chai3d::cVector3d p0 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 0]].x(),
+                                                 Polygons.m_positions[Polygons.m_indices[i + 0]].y(),
+                                                 Polygons.m_positions[Polygons.m_indices[i + 0]].z());
+        chai3d::cVector3d p1 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 1]].x(),
+                                                 Polygons.m_positions[Polygons.m_indices[i + 1]].y(),
+                                                 Polygons.m_positions[Polygons.m_indices[i + 1]].z());
+        chai3d::cVector3d p2 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 2]].x(),  
+                                                 Polygons.m_positions[Polygons.m_indices[i + 2]].y(),
+                                                 Polygons.m_positions[Polygons.m_indices[i + 2]].z());
+
+        // define a triangle color
+        chai3d::cColorf color;
+        color.set((Polygons.m_positions[Polygons.m_indices[i]].x() + 1.0) * 0.5,
+            (Polygons.m_positions[Polygons.m_indices[i]].y() + 1.0) * 0.5,
+            0.5);
+
+        // create three new vertices
+        int vertex0 = Polygons.m_object->newVertex();
+        int vertex1 = Polygons.m_object->newVertex();
+        int vertex2 = Polygons.m_object->newVertex();
+
+        // set position of each vertex
+        Polygons.m_object->m_vertices->setLocalPos(vertex0, p0);
+        Polygons.m_object->m_vertices->setLocalPos(vertex1, p1);
+        Polygons.m_object->m_vertices->setLocalPos(vertex2, p2);
+
+        // assign color to each vertex
+        Polygons.m_object->m_vertices->setColor(vertex0, color);
+        Polygons.m_object->m_vertices->setColor(vertex1, color);
+        Polygons.m_object->m_vertices->setColor(vertex2, color);
+
+        // create new triangle from vertices
+        Polygons.m_object->newTriangle(vertex0, vertex1, vertex2);
+    }
+
+    // compute surface normals
+    Polygons.m_object->computeAllNormals();
+
+    // we indicate that we ware rendering triangles by using specific colors for each of them (see above)
+    Polygons.m_object->setUseVertexColors(true);
+}
+
+void ChaiWorld::cameraMoveLeft() {
+    m_cameraPos.y(m_cameraPos.y() - 0.1);
+    m_cameraLookAt.y(m_cameraLookAt.y() - 0.1);
+    m_camera->set(m_cameraPos,    // camera position (eye)
+        m_cameraLookAt,    // look at position (target)
+        chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
+}
+
+void ChaiWorld::cameraMoveRight() {
+    m_cameraPos.y(m_cameraPos.y() + 0.1);
+    m_cameraLookAt.y(m_cameraLookAt.y() + 0.1);
+    m_camera->set(m_cameraPos,    // camera position (eye)
+        m_cameraLookAt,    // look at position (target)
+        chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
+}
+
+void ChaiWorld::cameraMoveForward() {
+    m_cameraPos.x(m_cameraPos.x() - 0.1);
+    m_cameraLookAt.x(m_cameraLookAt.x() - 0.1);
+    m_camera->set(m_cameraPos,    // camera position (eye)
+        m_cameraLookAt,    // look at position (target)
+        chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
+}
+
+void ChaiWorld::cameraMoveBack() {
+    m_cameraPos.x(m_cameraPos.x() + 0.1);
+    m_cameraLookAt.x(m_cameraLookAt.x() + 0.1);
+    m_camera->set(m_cameraPos,    // camera position (eye)
+        m_cameraLookAt,    // look at position (target)
+        chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
 }
 
 void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2) {

@@ -17,6 +17,7 @@
 Rigid* table;
 Deformable* cloth;
 Deformable* cloth2;
+Polygons* polygonCloth;
 
 //------------------------------------------------------------------------------
 // TEXT VARIABLES
@@ -200,16 +201,18 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.5), 0.8, 0.3, 0.2, 1.0);
     //texture 1
-    cloth = new Deformable(13, 13, chai3d::cVector3d(-0.5, -1.0, -0.1), 10);
+    cloth = new Deformable(15, 15, chai3d::cVector3d(-0.5, 0.0, -0.1), 10);
     //texture 2
-    cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
-    //texture 3
-    //cloth = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 100);
+    //cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
+    //polygon version
+    polygonCloth = new Polygons(15, 15, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
 
     ChaiWorld::chaiWorld.attachRigidObject(*table);
     ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
-    ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
+    //ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
+    ChaiWorld::chaiWorld.attachPolygons(*polygonCloth);
+
 
     //--------------------------------------------------------------------------
     // WIDGETS
@@ -396,6 +399,20 @@ void close(void)
 void updateGraphics(void)
 {
     /////////////////////////////////////////////////////////////////////
+    // UPDATE CAMERA
+    /////////////////////////////////////////////////////////////////////
+
+    if (isWPressing)
+        ChaiWorld::chaiWorld.cameraMoveForward();
+    if (isSPressing)
+        ChaiWorld::chaiWorld.cameraMoveBack();
+    if(isAPressing)
+        ChaiWorld::chaiWorld.cameraMoveLeft();
+    if (isDPressing)
+        ChaiWorld::chaiWorld.cameraMoveRight();
+
+
+    /////////////////////////////////////////////////////////////////////
     // UPDATE WIDGETS
     /////////////////////////////////////////////////////////////////////
 
@@ -461,7 +478,8 @@ void updateHaptics(void)
         // restart clock
         clock.start(true);
 
-        ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);
+        ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);             // one texture
+        //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);   // two texture comparison
 
         // signal frequency counter
         freqCounterHaptics.signal(1);
