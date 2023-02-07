@@ -62,7 +62,7 @@ ChaiWorld::ChaiWorld() {
     //-----------------------------------------------------------------------
 
     // create a haptic device handler
-    m_handler = new chai3d::cHapticDeviceHandler();
+    /*m_handler = new chai3d::cHapticDeviceHandler();
 
     // get access to the first available haptic device found
     m_handler->getDevice(m_hapticDevice, 0);
@@ -92,25 +92,35 @@ ChaiWorld::ChaiWorld() {
     m_device = new chai3d::cShapeSphere(m_deviceRadius);
     m_world->addChild(m_device);
     m_device->m_material->setWhite();
-    m_device->m_material->setShininess(100);
+    m_device->m_material->setShininess(100);*/
 
 
     //=================for rigid=========================
+    
+     // create a haptic device handler
+    m_handler = new chai3d::cHapticDeviceHandler();
+
+    // get access to the first available haptic device found
+    m_handler->getDevice(m_hapticDevice, 0);
+
+    m_hapticDeviceInfo = m_hapticDevice->getSpecifications();
+
+    
     // create a 3D tool and add it to the world
-    /*m_tool = new chai3d::cToolCursor(m_world);
+    m_tool = new chai3d::cToolCursor(m_world);
     m_camera->addChild(m_tool);
 
     // position tool in respect to camera
-    m_tool->setLocalPos(0.0, 0.0, 0.0);
+    m_tool->setLocalPos(-3.0, 0.0, 0.0);
 
     // connect the haptic device to the tool
     m_tool->setHapticDevice(m_hapticDevice);
 
     // set radius of tool
-    double toolRadius = 0.1;
+    m_toolRadius = 0.1;
 
     // define a radius for the tool
-    m_tool->setRadius(toolRadius);
+    m_tool->setRadius(m_toolRadius);
 
     // map the physical workspace of the haptic device to a larger virtual workspace.
     m_tool->setWorkspaceRadius(1.0);
@@ -121,8 +131,12 @@ ChaiWorld::ChaiWorld() {
     m_tool->setWaitForSmallForce(true);
 
     // start the haptic tool
-    m_tool->start();*/
+    m_tool->start();
 
+    m_workspaceScaleFactor = m_tool->getWorkspaceScaleFactor();
+
+    // properties
+    m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
 
 
     // create a world which supports deformable object
@@ -211,8 +225,10 @@ void ChaiWorld::attachRigidObject(Rigid& rigid) {
     // create plane
     cCreatePlane(rigid.m_object, rigid.m_width, rigid.m_length);
 
+    rigid.m_object->createAABBCollisionDetector(m_toolRadius);
+
     // create collision detector
-    rigid.m_object->createAABBCollisionDetector(m_deviceRadius);
+    //rigid.m_object->createAABBCollisionDetector(m_deviceRadius);
 
     // add object to world
     m_world->addChild(rigid.m_object);
@@ -251,61 +267,78 @@ void ChaiWorld::attachRigidObject(Rigid& rigid) {
     rigid.m_object->m_material->setStaticFriction(rigid.m_staticFriction);
     rigid.m_object->m_material->setDynamicFriction(rigid.m_dynamicFriction);
     rigid.m_object->m_material->setTextureLevel(rigid.m_textureLevel);
-    rigid.m_object->m_material->setHapticTriangleSides(true, false);
+    rigid.m_object->m_material->setHapticTriangleSides(true, true);
 }
 
-void ChaiWorld::attachPolygons(Polygons& Polygons) {
+void ChaiWorld::attachPolygons(Polygons& polygons) {
     
-    m_world->addChild(Polygons.m_object);
+    m_world->addChild(polygons.m_object);
 
     // set the position of the object at the center of the world
-    Polygons.m_object->setLocalPos(0.0, 0.0, 0.0);
+    polygons.m_object->setLocalPos(0.0, 0.0, 0.0);
 
     // Since we want to see our polygons from both sides, we disable culling.
-    Polygons.m_object->setUseCulling(false);
+    polygons.m_object->setUseCulling(false);
 
-    for (int i = 0; i < Polygons.m_indices.size(); i += 3) {
+    for (int i = 0; i < polygons.m_indices.size(); i += 3) {
         // define triangle points
-        chai3d::cVector3d p0 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 0]].x(),
-                                                 Polygons.m_positions[Polygons.m_indices[i + 0]].y(),
-                                                 Polygons.m_positions[Polygons.m_indices[i + 0]].z());
-        chai3d::cVector3d p1 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 1]].x(),
-                                                 Polygons.m_positions[Polygons.m_indices[i + 1]].y(),
-                                                 Polygons.m_positions[Polygons.m_indices[i + 1]].z());
-        chai3d::cVector3d p2 = chai3d::cVector3d(Polygons.m_positions[Polygons.m_indices[i + 2]].x(),  
-                                                 Polygons.m_positions[Polygons.m_indices[i + 2]].y(),
-                                                 Polygons.m_positions[Polygons.m_indices[i + 2]].z());
+        chai3d::cVector3d p0 = chai3d::cVector3d(polygons.m_positions[polygons.m_indices[i + 0]].x(),
+                                                 polygons.m_positions[polygons.m_indices[i + 0]].y(),
+                                                 polygons.m_positions[polygons.m_indices[i + 0]].z());
+        chai3d::cVector3d p1 = chai3d::cVector3d(polygons.m_positions[polygons.m_indices[i + 1]].x(),
+                                                 polygons.m_positions[polygons.m_indices[i + 1]].y(),
+                                                 polygons.m_positions[polygons.m_indices[i + 1]].z());
+        chai3d::cVector3d p2 = chai3d::cVector3d(polygons.m_positions[polygons.m_indices[i + 2]].x(),
+                                                 polygons.m_positions[polygons.m_indices[i + 2]].y(),
+                                                 polygons.m_positions[polygons.m_indices[i + 2]].z());
 
         // define a triangle color
         chai3d::cColorf color;
-        color.set((Polygons.m_positions[Polygons.m_indices[i]].x() + 1.0) * 0.5,
-            (Polygons.m_positions[Polygons.m_indices[i]].y() + 1.0) * 0.5,
+        color.set((polygons.m_positions[polygons.m_indices[i]].x() + 1.0) * 0.5,
+            (polygons.m_positions[polygons.m_indices[i]].y() + 1.0) * 0.5,
             0.5);
 
         // create three new vertices
-        int vertex0 = Polygons.m_object->newVertex();
-        int vertex1 = Polygons.m_object->newVertex();
-        int vertex2 = Polygons.m_object->newVertex();
+        int vertex0 = polygons.m_object->newVertex();
+        int vertex1 = polygons.m_object->newVertex();
+        int vertex2 = polygons.m_object->newVertex();
 
         // set position of each vertex
-        Polygons.m_object->m_vertices->setLocalPos(vertex0, p0);
-        Polygons.m_object->m_vertices->setLocalPos(vertex1, p1);
-        Polygons.m_object->m_vertices->setLocalPos(vertex2, p2);
+        polygons.m_object->m_vertices->setLocalPos(vertex0, p0);
+        polygons.m_object->m_vertices->setLocalPos(vertex1, p1);
+        polygons.m_object->m_vertices->setLocalPos(vertex2, p2);
 
         // assign color to each vertex
-        Polygons.m_object->m_vertices->setColor(vertex0, color);
-        Polygons.m_object->m_vertices->setColor(vertex1, color);
-        Polygons.m_object->m_vertices->setColor(vertex2, color);
+        polygons.m_object->m_vertices->setColor(vertex0, color);
+        polygons.m_object->m_vertices->setColor(vertex1, color);
+        polygons.m_object->m_vertices->setColor(vertex2, color);
 
         // create new triangle from vertices
-        Polygons.m_object->newTriangle(vertex0, vertex1, vertex2);
+        polygons.m_object->newTriangle(vertex0, vertex1, vertex2);
     }
 
     // compute surface normals
-    Polygons.m_object->computeAllNormals();
+    polygons.m_object->computeAllNormals();
 
     // we indicate that we ware rendering triangles by using specific colors for each of them (see above)
-    Polygons.m_object->setUseVertexColors(true);
+    polygons.m_object->setUseVertexColors(true);
+
+    // we indicate that we also using material properties. If you set this parameter to 'false'
+    // you will notice that only vertex colors are used to render triangle, and lighting
+    // will not longer have any effect.
+    polygons.m_object->setUseMaterial(true);
+
+    // compute a boundary box
+    polygons.m_object->computeBoundaryBox(true);
+
+    polygons.m_object->createAABBCollisionDetector(m_toolRadius);
+
+    // set haptic properties
+    polygons.m_object->m_material->setStiffness(polygons.m_stiffness * m_maxStiffness);
+    polygons.m_object->m_material->setStaticFriction(polygons.m_staticFriction);
+    polygons.m_object->m_material->setDynamicFriction(polygons.m_dynamicFriction);
+    polygons.m_object->m_material->setTextureLevel(polygons.m_textureLevel);
+    polygons.m_object->m_material->setHapticTriangleSides(true, true);
 }
 
 void ChaiWorld::cameraMoveLeft() {
@@ -324,6 +357,12 @@ void ChaiWorld::cameraMoveRight() {
         chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
 }
 
+void ChaiWorld::updateCloth(Polygons* polygonCloth) {
+   
+    polygonCloth->updatePolygons();
+    
+}
+
 void ChaiWorld::cameraMoveForward() {
     m_cameraPos.x(m_cameraPos.x() - 0.1);
     m_cameraLookAt.x(m_cameraLookAt.x() - 0.1);
@@ -340,7 +379,7 @@ void ChaiWorld::cameraMoveBack() {
         chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
 }
 
-void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2) {
+void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2, Polygons* polygonCloth) {
     // read position from haptic device
     chai3d::cVector3d pos;
     m_hapticDevice->getPosition(pos);
@@ -360,9 +399,11 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Defo
             chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
             chai3d::cVector3d tmpfrc = -1.0 * f;
 
-            //X[y * 21 + x].x = nodePos.x();
-            //X[y * 21 + x].y = nodePos.y() + 0.01;
-            //X[y * 21 + x].z = nodePos.z();
+            if (polygonCloth) {
+                polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
+                polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
+                polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z()+0.04);
+            }
 
             double modelHeight = cloth->m_modelRadius;
             //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
@@ -418,25 +459,55 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Defo
 
     // send forces to haptic device
     ChaiWorld::chaiWorld.getHapticDevice()->setForce(force);
+}
 
-    /* triangle objects */
+void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {
+
+    chai3d::cVector3d pos(100.0, 100.0, 100.0);
+
+    m_defWorld->clearExternalForces();
+
+    for (int i = 0; i < cloth->m_length; i++)
+    {
+        for (int j = 0; j < cloth->m_width; j++)
+        {
+            chai3d::cVector3d nodePos = cloth->m_nodes[i][j]->m_pos;
+            chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
+            chai3d::cVector3d tmpfrc = -1.0 * f;
+
+            if (polygonCloth) {
+                polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
+                polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
+                polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
+            }
+
+            double modelHeight = cloth->m_modelRadius;
+            //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
+            //    std::cout << cGELSkeletonLink::s_default_kSpringElongation * (table->getOffset().z() - nodePos.get(2)) << std::endl;
+            if (nodePos.get(2) - table->getOffset().z() < modelHeight) {
+                tmpfrc.z(tmpfrc.get(2) +
+                    cGELSkeletonLink::s_default_kSpringElongation * (modelHeight + table->getOffset().z() - nodePos.get(2)));
+            }
+            cloth->m_nodes[i][j]->setExternalForce(tmpfrc);
+        }
+    }
+
+    ChaiWorld::chaiWorld.getDefWorld()->updateDynamics(time);
+
+
     // compute global reference frames for each object
-    //ChaiWorld::chaiWorld.getWorld()->computeGlobalPositions(true);
-
-
-    // for rigids
-
-    // compute global reference frames for each object
-    /*m_world->computeGlobalPositions(true);
+    m_world->computeGlobalPositions(true);
 
     // update position and orientation of tool
     m_tool->updateFromDevice();
+
+    std::cout << m_tool->getDeviceLocalForce() << std::endl; 
 
     // compute interaction forces
     m_tool->computeInteractionForces();
 
     // send forces to haptic device
-    m_tool->applyToDevice();*/
+    m_tool->applyToDevice();
 }
 
 chai3d::cVector3d ChaiWorld::computeForce(const chai3d::cVector3d& a_cursor,

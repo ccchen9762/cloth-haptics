@@ -13,6 +13,9 @@ public:
 		double stiffness, double staticFriction, double dynamicFriction, double textureLevel);
 	~Polygons();
 
+	void updatePolygons();
+	void changeWireMode();
+
 private:
 	chai3d::cMesh* m_object;
 

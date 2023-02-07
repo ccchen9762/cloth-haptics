@@ -111,6 +111,8 @@ int main(int argc, char* argv[])
     std::cout << "Keyboard Options:" << std::endl << std::endl;
     std::cout << "[f] - Enable/Disable full screen mode" << std::endl;
     std::cout << "[m] - Enable/Disable display points" << std::endl;
+    std::cout << "[k] - Enable/Disable skeleton model" << std::endl;
+    std::cout << "[l] - Enable/Disable polygon wire mode" << std::endl;
     std::cout << "[q] - Exit application" << std::endl;
     std::cout << std::endl << std::endl;
 
@@ -201,11 +203,11 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.5), 0.8, 0.3, 0.2, 1.0);
     //texture 1
-    cloth = new Deformable(15, 15, chai3d::cVector3d(-0.5, 0.0, -0.1), 10);
+    cloth = new Deformable(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 10);
     //texture 2
     //cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
     //polygon version
-    polygonCloth = new Polygons(15, 15, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
+    polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
 
     ChaiWorld::chaiWorld.attachRigidObject(*table);
@@ -324,12 +326,8 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
             cloth->getDefObject()->m_showSkeletonModel = !cloth->getDefObject()->m_showSkeletonModel;
         break;
     case GLFW_KEY_L:
-        /*bool useWireMode = !clothObject->getWireMode();
-        clothObject->setWireMode(useWireMode);
-        if (useWireMode)
-            std::cout << "> Wire mode enabled  \r";
-        else
-            std::cout << "> Wire mode disabled \r";*/
+        if (a_action == GLFW_PRESS)
+            polygonCloth->changeWireMode();
         break;
     case GLFW_KEY_F:
         if (a_action == GLFW_PRESS)
@@ -382,7 +380,13 @@ void close(void)
     while (!simulationFinished) { chai3d::cSleepMs(100); }
 
     // close haptic device
-    ChaiWorld::chaiWorld.getHapticDevice()->close();
+    if (ChaiWorld::chaiWorld.getHapticDevice()) {
+        ChaiWorld::chaiWorld.getHapticDevice()->close();
+    }
+    if (ChaiWorld::chaiWorld.getTool()) {
+        ChaiWorld::chaiWorld.getTool()->stop();
+    }
+    
 
     // delete resources
     delete hapticsThread;
@@ -437,16 +441,8 @@ void updateGraphics(void)
     // render world
     ChaiWorld::chaiWorld.getCamera()->renderView(windowWidth, windowHeight);
 
-    // render cloth
-    /*for (int i = 0; i < clothObject->getNumVertices(); i+=3) {
-        chai3d::cVector3d p0 = chai3d::cVector3d(X[indices[i + 0]].x, X[indices[i + 0]].y, X[indices[i + 0]].z);
-        chai3d::cVector3d p1 = chai3d::cVector3d(X[indices[i + 1]].x, X[indices[i + 1]].y, X[indices[i + 1]].z);
-        chai3d::cVector3d p2 = chai3d::cVector3d(X[indices[i + 2]].x, X[indices[i + 2]].y, X[indices[i + 2]].z);
+    ChaiWorld::chaiWorld.updateCloth(polygonCloth);
 
-        clothObject->m_vertices->setLocalPos(i, p0);
-        clothObject->m_vertices->setLocalPos(i+1, p1);
-        clothObject->m_vertices->setLocalPos(i+2, p2);
-    }*/
 
     // wait until all GL commands are completed
     glFinish();
@@ -476,10 +472,15 @@ void updateHaptics(void)
         double time = chai3d::cMin(0.001, clock.stop());
 
         // restart clock
-        clock.start(true);
+        //clock.start(true);
 
-        ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);             // one texture
+        //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);             // one texture
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);   // two texture comparison
+        //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, nullptr, polygonCloth);     // one texture with polygon
+
+        ChaiWorld::chaiWorld.updateHapticsRigid(time, table, cloth, polygonCloth);
+        //ChaiWorld::chaiWorld.updateHapticsRigid(time, table, nullptr, polygonCloth);
+
 
         // signal frequency counter
         freqCounterHaptics.signal(1);

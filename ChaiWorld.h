@@ -24,6 +24,7 @@ public:
 	chai3d::cHapticDeviceHandler* getHandler() { return m_handler; }
 	chai3d::cGenericHapticDevicePtr getHapticDevice() { return m_hapticDevice; }
 	chai3d::cShapeSphere* getDevice() { return m_device; }
+	chai3d::cToolCursor* getTool() { return m_tool; }
 	double getDeviceForceScale() { return m_deviceForceScale; }
 	double getWorkspaceScaleFactor() { return m_workspaceScaleFactor; }
 	double getMaxStiffness() { return m_maxStiffness; }
@@ -38,8 +39,13 @@ public:
 	void cameraMoveLeft();
 	void cameraMoveRight();
 
+	void updateCloth(Polygons* polygonCloth);
+
 	// main haptics simulation loop
-	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr);
+	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr, Polygons* polygonCloth=nullptr);
+
+	void updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth);
+
 	// compute forces between tool and environment
 	chai3d::cVector3d computeForce(const chai3d::cVector3d& a_cursor,
 		double a_cursorRadius,
@@ -71,6 +77,7 @@ private:
 	chai3d::cGenericHapticDevicePtr m_hapticDevice;
 
 	chai3d::cToolCursor* m_tool;
+	double m_toolRadius;
 
 	// force scale factor
 	double m_deviceForceScale;
