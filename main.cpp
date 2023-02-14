@@ -10,9 +10,10 @@
 #include "Global.h"
 #include "ChaiWorld.h"
 
-#include <GLFW/glfw3.h> // include after chai3d
+#include <GLFW/glfw3.h> // must include after chai3d
 //------------------------------------------------------------------------------
 
+// object list
 
 Rigid* table;
 Deformable* cloth;
@@ -20,7 +21,7 @@ Deformable* cloth2;
 Polygons* polygonCloth;
 
 //------------------------------------------------------------------------------
-// TEXT VARIABLES
+// GENERAL VARIABLES
 //------------------------------------------------------------------------------
 
 // a label to display the rate [Hz] at which the simulation is running

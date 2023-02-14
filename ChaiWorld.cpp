@@ -62,13 +62,15 @@ ChaiWorld::ChaiWorld() {
     //-----------------------------------------------------------------------
 
     // create a haptic device handler
-    /*m_handler = new chai3d::cHapticDeviceHandler();
+    m_handler = new chai3d::cHapticDeviceHandler();
 
     // get access to the first available haptic device found
     m_handler->getDevice(m_hapticDevice, 0);
 
     // retrieve information about the current haptic device
     m_hapticDeviceInfo = m_hapticDevice->getSpecifications();
+
+    //=================for deformable=========================
 
     // open connection to haptic device
     m_hapticDevice->open();
@@ -80,8 +82,8 @@ ChaiWorld::ChaiWorld() {
     // device and the virtual workspace defined for the tool
     m_workspaceScaleFactor = m_cursorWorkspaceRadius / m_hapticDeviceInfo.m_workspaceRadius;
 
-    // properties
-    m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
+    // properties same
+    //m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
 
     // define a scale factor between the force perceived at the cursor and the
     // forces actually sent to the haptic device
@@ -92,19 +94,10 @@ ChaiWorld::ChaiWorld() {
     m_device = new chai3d::cShapeSphere(m_deviceRadius);
     m_world->addChild(m_device);
     m_device->m_material->setWhite();
-    m_device->m_material->setShininess(100);*/
+    m_device->m_material->setShininess(100);
 
 
     //=================for rigid=========================
-    
-     // create a haptic device handler
-    m_handler = new chai3d::cHapticDeviceHandler();
-
-    // get access to the first available haptic device found
-    m_handler->getDevice(m_hapticDevice, 0);
-
-    m_hapticDeviceInfo = m_hapticDevice->getSpecifications();
-
     
     // create a 3D tool and add it to the world
     m_tool = new chai3d::cToolCursor(m_world);
@@ -131,7 +124,7 @@ ChaiWorld::ChaiWorld() {
     m_tool->setWaitForSmallForce(true);
 
     // start the haptic tool
-    m_tool->start();
+    m_tool->start(); //m_hapticDevice->open()
 
     m_workspaceScaleFactor = m_tool->getWorkspaceScaleFactor();
 
@@ -139,13 +132,13 @@ ChaiWorld::ChaiWorld() {
     m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
 
 
-    // create a world which supports deformable object
+    // ========== create a world which supports deformable object ============
     m_defWorld = new cGELWorld();
     m_world->addChild(m_defWorld);
 }
 
 ChaiWorld::~ChaiWorld() {
-    // no need to clean on this side
+    // no need to clean in here
     //delete m_world;
     //delete m_camera;
     //delete m_light;
@@ -501,7 +494,7 @@ void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth,
     // update position and orientation of tool
     m_tool->updateFromDevice();
 
-    std::cout << m_tool->getDeviceLocalForce() << std::endl; 
+    //std::cout << m_tool->getDeviceLocalForce() << std::endl; 
 
     // compute interaction forces
     m_tool->computeInteractionForces();
