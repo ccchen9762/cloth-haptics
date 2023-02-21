@@ -27,8 +27,8 @@ private:
 
 	std::vector<int> m_indices;
 	std::vector<chai3d::cVector3d> m_positions;
-	std::vector<chai3d::cVector3d> m_velocity;
-	std::vector<chai3d::cVector3d> m_acceleration;
+	//std::vector<chai3d::cVector3d> m_velocity;
+	//std::vector<chai3d::cVector3d> m_acceleration;
 
 	// texture setttings
 	double m_stiffness;

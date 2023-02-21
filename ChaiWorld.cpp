@@ -73,7 +73,7 @@ ChaiWorld::ChaiWorld() {
     //=================for deformable=========================
 
     // open connection to haptic device
-    m_hapticDevice->open();
+    /*m_hapticDevice->open();
 
     // desired workspace radius of the cursor
     m_cursorWorkspaceRadius = 0.7;
@@ -94,7 +94,7 @@ ChaiWorld::ChaiWorld() {
     m_device = new chai3d::cShapeSphere(m_deviceRadius);
     m_world->addChild(m_device);
     m_device->m_material->setWhite();
-    m_device->m_material->setShininess(100);
+    m_device->m_material->setShininess(100);*/
 
 
     //=================for rigid=========================
@@ -131,6 +131,9 @@ ChaiWorld::ChaiWorld() {
     // properties
     m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
 
+
+    // test merge
+    m_hapticDevice = m_tool->getHapticDevice();
 
     // ========== create a world which supports deformable object ============
     m_defWorld = new cGELWorld();
@@ -285,12 +288,6 @@ void ChaiWorld::attachPolygons(Polygons& polygons) {
                                                  polygons.m_positions[polygons.m_indices[i + 2]].y(),
                                                  polygons.m_positions[polygons.m_indices[i + 2]].z());
 
-        // define a triangle color
-        chai3d::cColorf color;
-        color.set((polygons.m_positions[polygons.m_indices[i]].x() + 1.0) * 0.5,
-            (polygons.m_positions[polygons.m_indices[i]].y() + 1.0) * 0.5,
-            0.5);
-
         // create three new vertices
         int vertex0 = polygons.m_object->newVertex();
         int vertex1 = polygons.m_object->newVertex();
@@ -302,9 +299,15 @@ void ChaiWorld::attachPolygons(Polygons& polygons) {
         polygons.m_object->m_vertices->setLocalPos(vertex2, p2);
 
         // assign color to each vertex
-        polygons.m_object->m_vertices->setColor(vertex0, color);
-        polygons.m_object->m_vertices->setColor(vertex1, color);
-        polygons.m_object->m_vertices->setColor(vertex2, color);
+        polygons.m_object->m_vertices->setColor(vertex0, chai3d::cColorf((p0.x() + 1.0) * 0.5,
+            (p0.y() + 1.0) * 0.5,
+            0.5));
+        polygons.m_object->m_vertices->setColor(vertex1, chai3d::cColorf((p1.x() + 1.0) * 0.5,
+            (p1.y() + 1.0) * 0.5,
+            0.5));
+        polygons.m_object->m_vertices->setColor(vertex2, chai3d::cColorf((p2.x() + 1.0) * 0.5,
+            (p2.y() + 1.0) * 0.5,
+            0.5));
 
         // create new triangle from vertices
         polygons.m_object->newTriangle(vertex0, vertex1, vertex2);
@@ -455,10 +458,15 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Defo
 }
 
 void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {
+    chai3d::cVector3d pos;
+    m_hapticDevice->getPosition(pos);
+    pos.mul(m_workspaceScaleFactor);
+    //m_device->setLocalPos(pos);
 
-    chai3d::cVector3d pos(100.0, 100.0, 100.0);
+    //chai3d::cVector3d pos(100.0, 100.0, 100.0);
 
     m_defWorld->clearExternalForces();
+    chai3d::cVector3d force(0.0, 0.0, 0.0);
 
     for (int i = 0; i < cloth->m_length; i++)
     {
@@ -468,11 +476,11 @@ void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth,
             chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
             chai3d::cVector3d tmpfrc = -1.0 * f;
 
-            if (polygonCloth) {
+            /*if (polygonCloth) {
                 polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
                 polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
                 polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
-            }
+            }*/
 
             double modelHeight = cloth->m_modelRadius;
             //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
@@ -482,6 +490,8 @@ void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth,
                     cGELSkeletonLink::s_default_kSpringElongation * (modelHeight + table->getOffset().z() - nodePos.get(2)));
             }
             cloth->m_nodes[i][j]->setExternalForce(tmpfrc);
+
+            force.add(f);
         }
     }
 

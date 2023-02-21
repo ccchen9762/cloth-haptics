@@ -18,8 +18,8 @@ Polygons::Polygons(int width, int length, chai3d::cVector3d offset,
                                                                  offset.y() + ((float(j) / length) * 2 - 1) * 2.0f / 5,
                                                                  offset.z());*/
             m_positions[i * width + j] = chai3d::cVector3d(offset.x() - 0.1 * length / 2 + 0.1 * (double)i,
-                                                                 offset.y() - 0.1 * width / 2 + 0.1 * (double)j,
-                                                                 offset.z());
+                                                           offset.y() - 0.1 * width / 2 + 0.1 * (double)j,
+                                                           offset.z());
         }
     }
 
