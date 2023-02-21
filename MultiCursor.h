@@ -18,6 +18,8 @@ public:
 	MultiCursor(chai3d::cWorld* a_parentWorld, const double& a_radius);
 	~MultiCursor();
 
+	bool applyToDevice() override;
+
 	// overload function to apply extra deformable force along with rigid force
 	bool applyToDevice(chai3d::cVector3d deformableForce);
 

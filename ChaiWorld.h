@@ -24,8 +24,7 @@ public:
 	chai3d::cCamera* getCamera() { return m_camera; }
 	chai3d::cHapticDeviceHandler* getHandler() { return m_handler; }
 	chai3d::cGenericHapticDevicePtr getHapticDevice() { return m_hapticDevice; }
-	//chai3d::cShapeSphere* getDevice() { return m_device; }
-	//chai3d::cToolCursor* getTool() { return m_tool; }
+	MultiCursor* getCursor() { return m_multiCursor; }
 	double getDeviceForceScale() { return m_deviceForceScale; }
 	double getWorkspaceScaleFactor() { return m_workspaceScaleFactor; }
 	double getMaxStiffness() { return m_maxStiffness; }
@@ -80,19 +79,6 @@ private:
 	// a pointer to the current haptic device
 	chai3d::cGenericHapticDevicePtr m_hapticDevice;
 
-	//---------------------------------------------------------------------------
-	// for rigidbody
-	//---------------------------------------------------------------------------
-
-
-	chai3d::cToolCursor* m_tool;
-	double m_toolRadius;
-
-	//---------------------------------------------------------------------------
-	// for GEL
-	//---------------------------------------------------------------------------
-
-
 	// force scale factor
 	double m_deviceForceScale;
 
@@ -112,12 +98,6 @@ private:
 
 	// haptic device information
 	chai3d::cHapticDeviceInfo m_hapticDeviceInfo;
-
-	// haptic device model
-	chai3d::cShapeSphere* m_device;
-	double m_deviceRadius;
-
-	// ==============================================================
 
 	// a cursor that can touch both deformable(cGELMesh) and rigidbody(cMesh)
 	MultiCursor* m_multiCursor;
