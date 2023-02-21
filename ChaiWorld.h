@@ -3,6 +3,7 @@
 #include "chai3d.h"
 #include "GEL3D.h"
 
+#include "MultiCursor.h"
 #include "Deformable.h"
 #include "Rigid.h"
 #include "Polygons.h"
@@ -23,8 +24,8 @@ public:
 	chai3d::cCamera* getCamera() { return m_camera; }
 	chai3d::cHapticDeviceHandler* getHandler() { return m_handler; }
 	chai3d::cGenericHapticDevicePtr getHapticDevice() { return m_hapticDevice; }
-	chai3d::cShapeSphere* getDevice() { return m_device; }
-	chai3d::cToolCursor* getTool() { return m_tool; }
+	//chai3d::cShapeSphere* getDevice() { return m_device; }
+	//chai3d::cToolCursor* getTool() { return m_tool; }
 	double getDeviceForceScale() { return m_deviceForceScale; }
 	double getWorkspaceScaleFactor() { return m_workspaceScaleFactor; }
 	double getMaxStiffness() { return m_maxStiffness; }
@@ -42,9 +43,12 @@ public:
 	void updateCloth(Polygons* polygonCloth);
 
 	// main haptics simulation loop
-	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr, Polygons* polygonCloth=nullptr);
+	void updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2 = nullptr, Polygons* polygonCloth = nullptr) {};
 
-	void updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth);
+	void updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {};
+
+	void updateHapticsMulti(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth);
+
 
 	// compute forces between tool and environment
 	chai3d::cVector3d computeForce(const chai3d::cVector3d& a_cursor,
@@ -76,8 +80,18 @@ private:
 	// a pointer to the current haptic device
 	chai3d::cGenericHapticDevicePtr m_hapticDevice;
 
+	//---------------------------------------------------------------------------
+	// for rigidbody
+	//---------------------------------------------------------------------------
+
+
 	chai3d::cToolCursor* m_tool;
 	double m_toolRadius;
+
+	//---------------------------------------------------------------------------
+	// for GEL
+	//---------------------------------------------------------------------------
+
 
 	// force scale factor
 	double m_deviceForceScale;
@@ -91,6 +105,8 @@ private:
 	// desired workspace radius of the virtual cursor
 	double m_cursorWorkspaceRadius;
 
+	// ==============================================================
+	
 	// deformable world
 	cGELWorld* m_defWorld;
 
@@ -100,4 +116,10 @@ private:
 	// haptic device model
 	chai3d::cShapeSphere* m_device;
 	double m_deviceRadius;
+
+	// ==============================================================
+
+	// a cursor that can touch both deformable(cGELMesh) and rigidbody(cMesh)
+	MultiCursor* m_multiCursor;
+	double m_multiCursorRadius;
 };

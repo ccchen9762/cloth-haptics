@@ -70,6 +70,47 @@ ChaiWorld::ChaiWorld() {
     // retrieve information about the current haptic device
     m_hapticDeviceInfo = m_hapticDevice->getSpecifications();
 
+    // ================== test =================
+    // open connection to haptic device
+    //m_hapticDevice->open();
+
+    // desired workspace radius of the cursor
+    m_cursorWorkspaceRadius = 0.7;
+
+    // read the scale factor between the physical workspace of the haptic
+    // device and the virtual workspace defined for the tool
+    m_workspaceScaleFactor = m_cursorWorkspaceRadius / m_hapticDeviceInfo.m_workspaceRadius;
+
+    // properties same
+    //m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
+
+    // define a scale factor between the force perceived at the cursor and the
+    // forces actually sent to the haptic device
+    m_deviceForceScale = 5.0;
+
+    // define the radius of the tool (sphere)
+    m_multiCursorRadius = 0.1;
+
+    // create a cursor and insert into the world
+    m_multiCursor = new MultiCursor(m_world, m_multiCursorRadius);
+    m_world->addChild(m_multiCursor);
+
+    // connect the haptic device to the virtual tool
+    m_multiCursor->setHapticDevice(m_hapticDevice);
+
+    // define a radius for the tool
+    m_multiCursor->setRadius(m_multiCursorRadius);
+
+    // enable if objects in the scene are going to rotate of translate
+    // or possibly collide against the tool. If the environment
+    // is entirely static, you can set this parameter to "false"
+    m_multiCursor->enableDynamicObjects(true);
+
+    m_multiCursor->m_material->setWhite();
+    m_multiCursor->m_material->setShininess(100);
+
+    m_multiCursor->start();
+
     //=================for deformable=========================
 
     // open connection to haptic device
@@ -100,7 +141,7 @@ ChaiWorld::ChaiWorld() {
     //=================for rigid=========================
     
     // create a 3D tool and add it to the world
-    m_tool = new chai3d::cToolCursor(m_world);
+    /*m_tool = new chai3d::cToolCursor(m_world);
     m_camera->addChild(m_tool);
 
     // position tool in respect to camera
@@ -126,14 +167,10 @@ ChaiWorld::ChaiWorld() {
     // start the haptic tool
     m_tool->start(); //m_hapticDevice->open()
 
-    m_workspaceScaleFactor = m_tool->getWorkspaceScaleFactor();
+    m_workspaceScaleFactor = m_tool->getWorkspaceScaleFactor();*/
 
     // properties
     m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
-
-
-    // test merge
-    m_hapticDevice = m_tool->getHapticDevice();
 
     // ========== create a world which supports deformable object ============
     m_defWorld = new cGELWorld();
@@ -221,7 +258,8 @@ void ChaiWorld::attachRigidObject(Rigid& rigid) {
     // create plane
     cCreatePlane(rigid.m_object, rigid.m_width, rigid.m_length);
 
-    rigid.m_object->createAABBCollisionDetector(m_toolRadius);
+    //rigid.m_object->createAABBCollisionDetector(m_toolRadius);
+    rigid.m_object->createAABBCollisionDetector(m_multiCursorRadius);
 
     // create collision detector
     //rigid.m_object->createAABBCollisionDetector(m_deviceRadius);
@@ -327,8 +365,9 @@ void ChaiWorld::attachPolygons(Polygons& polygons) {
     // compute a boundary box
     polygons.m_object->computeBoundaryBox(true);
 
-    polygons.m_object->createAABBCollisionDetector(m_toolRadius);
-
+    //polygons.m_object->createAABBCollisionDetector(m_toolRadius);
+    polygons.m_object->createAABBCollisionDetector(m_multiCursorRadius);
+     
     // set haptic properties
     polygons.m_object->m_material->setStiffness(polygons.m_stiffness * m_maxStiffness);
     polygons.m_object->m_material->setStaticFriction(polygons.m_staticFriction);
@@ -375,7 +414,7 @@ void ChaiWorld::cameraMoveBack() {
         chai3d::cVector3d(0.0, 0.0, 1.0)); // up vector
 }
 
-void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2, Polygons* polygonCloth) {
+/*void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Deformable* cloth2, Polygons* polygonCloth) {
     // read position from haptic device
     chai3d::cVector3d pos;
     m_hapticDevice->getPosition(pos);
@@ -455,9 +494,9 @@ void ChaiWorld::updateHaptics(double time, Deformable* cloth, Rigid* table, Defo
 
     // send forces to haptic device
     ChaiWorld::chaiWorld.getHapticDevice()->setForce(force);
-}
+}*/
 
-void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {
+/*void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {
     chai3d::cVector3d pos;
     m_hapticDevice->getPosition(pos);
     pos.mul(m_workspaceScaleFactor);
@@ -476,11 +515,11 @@ void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth,
             chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
             chai3d::cVector3d tmpfrc = -1.0 * f;
 
-            /*if (polygonCloth) {
-                polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
-                polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
-                polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
-            }*/
+            //if (polygonCloth) {
+            //    polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
+            //    polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
+            //    polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
+            //}
 
             double modelHeight = cloth->m_modelRadius;
             //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
@@ -511,6 +550,72 @@ void ChaiWorld::updateHapticsRigid(double time, Rigid* table, Deformable* cloth,
 
     // send forces to haptic device
     m_tool->applyToDevice();
+}*/
+
+void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth, Polygons* polygonCloth) {
+    chai3d::cVector3d pos;
+    m_hapticDevice->getPosition(pos);
+    pos.mul(m_workspaceScaleFactor);
+    m_multiCursor->setLocalPos(pos);
+    //m_device->setLocalPos(pos);
+
+    // clear all external forces
+    m_defWorld->clearExternalForces();
+
+    // compute reaction forces
+    chai3d::cVector3d force(0.0, 0.0, 0.0);
+
+    for (int i = 0; i < cloth->m_length; i++)
+    {
+        for (int j = 0; j < cloth->m_width; j++)
+        {
+            chai3d::cVector3d nodePos = cloth->m_nodes[i][j]->m_pos;
+            chai3d::cVector3d f = computeForce(pos, m_multiCursorRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
+            //chai3d::cVector3d f = computeForce(pos, m_deviceRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
+            chai3d::cVector3d tmpfrc = -1.0 * f;
+
+            //if (polygonCloth) {
+            //    polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
+            //    polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
+            //    polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
+            //}
+
+            double modelHeight = cloth->m_modelRadius;
+            //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
+            //    std::cout << cGELSkeletonLink::s_default_kSpringElongation * (table->getOffset().z() - nodePos.get(2)) << std::endl;
+            if (nodePos.get(2) - table->getOffset().z() < modelHeight) {
+                tmpfrc.z(tmpfrc.get(2) +
+                    cGELSkeletonLink::s_default_kSpringElongation * (modelHeight + table->getOffset().z() - nodePos.get(2)));
+            }
+            cloth->m_nodes[i][j]->setExternalForce(tmpfrc);
+
+            force.add(f);
+        }
+    }
+
+    ChaiWorld::chaiWorld.getDefWorld()->updateDynamics(time);
+
+    // scale force
+    force.mul(ChaiWorld::chaiWorld.getDeviceForceScale() / ChaiWorld::chaiWorld.getWorkspaceScaleFactor());
+
+    // compute global reference frames for each object
+    m_world->computeGlobalPositions(true);
+
+
+
+    //m_hapticDevice->setForce(force);
+
+
+    // update position and orientation of tool
+    m_multiCursor->updateFromDevice();
+
+    //std::cout << m_tool->getDeviceLocalForce() << std::endl; 
+
+    // compute interaction forces
+    m_multiCursor->computeInteractionForces();
+
+    // send forces to haptic device
+    m_multiCursor->applyToDevice(force);
 }
 
 chai3d::cVector3d ChaiWorld::computeForce(const chai3d::cVector3d& a_cursor,

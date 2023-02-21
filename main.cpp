@@ -384,9 +384,9 @@ void close(void)
     if (ChaiWorld::chaiWorld.getHapticDevice()) {
         ChaiWorld::chaiWorld.getHapticDevice()->close();
     }
-    if (ChaiWorld::chaiWorld.getTool()) {
-        ChaiWorld::chaiWorld.getTool()->stop();
-    }
+    //if (ChaiWorld::chaiWorld.getTool()) {
+    //    ChaiWorld::chaiWorld.getTool()->stop();
+    //}
     
 
     // delete resources
@@ -479,7 +479,8 @@ void updateHaptics(void)
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);   // two texture comparison
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, nullptr, polygonCloth);     // one texture with polygon
 
-        ChaiWorld::chaiWorld.updateHapticsRigid(time, table, cloth, polygonCloth);
+        ChaiWorld::chaiWorld.updateHapticsMulti(time, table, cloth, polygonCloth);
+        //ChaiWorld::chaiWorld.updateHapticsRigid(time, table, cloth, polygonCloth);
         //ChaiWorld::chaiWorld.updateHapticsRigid(time, table, nullptr, polygonCloth);
 
 
