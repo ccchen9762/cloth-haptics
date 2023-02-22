@@ -70,17 +70,10 @@ ChaiWorld::ChaiWorld() {
     // retrieve information about the current haptic device
     m_hapticDeviceInfo = m_hapticDevice->getSpecifications();
 
-    // ================== Cursor =================
+    // ================== Cursor properties =================
     
     // desired workspace radius of the cursor
     m_cursorWorkspaceRadius = 0.7;
-
-    // read the scale factor between the physical workspace of the haptic
-    // device and the virtual workspace defined for the tool
-    m_workspaceScaleFactor = m_cursorWorkspaceRadius / m_hapticDeviceInfo.m_workspaceRadius;
-
-    // properties same
-    m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
 
     // define a scale factor between the force perceived at the cursor and the
     // forces actually sent to the haptic device
@@ -88,6 +81,8 @@ ChaiWorld::ChaiWorld() {
 
     // define the radius of the tool (sphere)
     m_multiCursorRadius = 0.1;
+
+    //  ============================ Cursor setup ===========================
 
     // create a cursor and insert into the world
     m_multiCursor = new MultiCursor(m_world, m_multiCursorRadius);
@@ -99,19 +94,42 @@ ChaiWorld::ChaiWorld() {
     // define a radius for the tool
     m_multiCursor->setRadius(m_multiCursorRadius);
 
+    // uncomment this line to see where the god object is 
+    //m_multiCursor->setShowContactPoints(true, true, chai3d::cColorf(0.0, 0.0, 0.0));
+
     // enable if objects in the scene are going to rotate of translate
     // or possibly collide against the tool. If the environment
     // is entirely static, you can set this parameter to "false"
     m_multiCursor->enableDynamicObjects(true);
 
-    m_multiCursor->m_material->setWhite();
-    m_multiCursor->m_material->setShininess(100);
+    // map the physical workspace of the haptic device to a larger virtual workspace.
+    m_multiCursor->setWorkspaceRadius(m_cursorWorkspaceRadius);
 
+    // haptic forces are enabled only if small forces are first sent to the device;
+    // this mode avoids the force spike that occurs when the application starts when 
+    // the tool is located inside an object for instance. 
+    m_multiCursor->setWaitForSmallForce(true);
+
+    // start the haptic tool
     m_multiCursor->start();
+
+    // ==================== calculation ====================
+
+    // read the scale factor between the physical workspace of the haptic
+    // device and the virtual workspace defined for the tool
+    m_workspaceScaleFactor = m_cursorWorkspaceRadius / m_hapticDeviceInfo.m_workspaceRadius;
+
+    // properties same
+    m_maxStiffness = m_hapticDeviceInfo.m_maxLinearStiffness / m_workspaceScaleFactor;
+
 
     // ========== create a world which supports deformable object ============
     m_defWorld = new cGELWorld();
     m_world->addChild(m_defWorld);
+
+    // set cursor texture
+    m_multiCursor->m_material->setWhite();
+    m_multiCursor->m_material->setShininess(100);
 }
 
 ChaiWorld::~ChaiWorld() {
@@ -355,7 +373,10 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
     chai3d::cVector3d pos;
     m_hapticDevice->getPosition(pos);
     pos.mul(m_workspaceScaleFactor);
-    m_multiCursor->setLocalPos(pos);
+    //m_multiCursor->setLocalPos(pos); // tool side will handle position set (m_multiCursor->updateFromDevice();)
+
+    // use proxy position to check collision with deformable object, otherwise god object will penetrate the rigidbody
+    chai3d::cVector3d renderPos = m_multiCursor->getHapticPoint(0)->getGlobalPosProxy();
 
     // clear all external forces
     m_defWorld->clearExternalForces();
@@ -368,7 +389,8 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
         for (int j = 0; j < cloth->m_width; j++)
         {
             chai3d::cVector3d nodePos = cloth->m_nodes[i][j]->m_pos;
-            chai3d::cVector3d f = computeForce(pos, m_multiCursorRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
+            //chai3d::cVector3d f = computeForce(pos, m_multiCursorRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
+            chai3d::cVector3d f = computeForce(renderPos, m_multiCursorRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
             chai3d::cVector3d tmpfrc = -1.0 * f;
 
             /*if (polygonCloth) {

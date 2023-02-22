@@ -8,6 +8,7 @@
 #include "Rigid.h"
 #include "Polygons.h"
 
+// a singleton class to handle all chai3d stuff
 
 class ChaiWorld
 {
@@ -56,7 +57,7 @@ public:
 		double a_radius,
 		double a_stiffness);
 
-	//singleton instance 
+	// singleton instance 
 	static ChaiWorld chaiWorld;
 
 private:
