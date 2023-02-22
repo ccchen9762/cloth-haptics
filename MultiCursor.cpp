@@ -7,6 +7,8 @@ MultiCursor::MultiCursor(chai3d::cWorld* a_parentWorld, const double& a_radius) 
 MultiCursor::~MultiCursor() {
 }
 
+// both applyToDevice functions are just copy from cToolCursor with little modifications in the end
+
 bool MultiCursor::applyToDevice() {
     // check if device is available
     if ((m_hapticDevice == nullptr) || (!m_enabled)) { return (chai3d::C_ERROR); }

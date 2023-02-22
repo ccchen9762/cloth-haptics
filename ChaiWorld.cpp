@@ -94,6 +94,9 @@ ChaiWorld::ChaiWorld() {
     // define a radius for the tool
     m_multiCursor->setRadius(m_multiCursorRadius);
 
+    
+    m_multiCursor->m_hapticPoint->m_sphereProxy->m_material->setWhite();
+
     // uncomment this line to see where the god object is 
     //m_multiCursor->setShowContactPoints(true, true, chai3d::cColorf(0.0, 0.0, 0.0));
 
@@ -126,10 +129,6 @@ ChaiWorld::ChaiWorld() {
     // ========== create a world which supports deformable object ============
     m_defWorld = new cGELWorld();
     m_world->addChild(m_defWorld);
-
-    // set cursor texture
-    m_multiCursor->m_material->setWhite();
-    m_multiCursor->m_material->setShininess(100);
 }
 
 ChaiWorld::~ChaiWorld() {
@@ -393,11 +392,11 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
             chai3d::cVector3d f = computeForce(renderPos, m_multiCursorRadius, nodePos, cloth->m_modelRadius, cloth->m_stiffness);
             chai3d::cVector3d tmpfrc = -1.0 * f;
 
-            /*if (polygonCloth) {
+            if (polygonCloth) {
                 polygonCloth->m_positions[i * cloth->m_length + j].x(nodePos.x());
                 polygonCloth->m_positions[i * cloth->m_length + j].y(nodePos.y());
                 polygonCloth->m_positions[i * cloth->m_length + j].z(nodePos.z() + 0.04);
-            }*/
+            }
 
             double modelHeight = cloth->m_modelRadius;
             //if (nodePos.get(2) - table->getOffset().z() < modelHeight)
@@ -408,7 +407,7 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
             }
             cloth->m_nodes[i][j]->setExternalForce(tmpfrc);
 
-            force.add(f);
+            //force.add(f);
         }
     }
 
@@ -432,6 +431,15 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
 
     // ====== force -> force from deformable object ===============================
     // ====== m_multiCursor->applyToDevice -> deformable force + rigid force ======
+
+
+    // compute surface normals
+    //polygonCloth->m_object->computeAllNormals();
+
+    // compute a boundary box
+    //polygonCloth->m_object->computeBoundaryBox(true);
+
+    polygonCloth->m_object->createAABBCollisionDetector(m_multiCursorRadius);
 }
 
 chai3d::cVector3d ChaiWorld::computeForce(const chai3d::cVector3d& a_cursor,
