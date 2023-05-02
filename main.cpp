@@ -208,13 +208,17 @@ int main(int argc, char* argv[])
     //texture 2
     //cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
     //polygon version
-    polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
+    //polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
 
-    ChaiWorld::chaiWorld.attachRigidObject(*table);
-    ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
-    //ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
-    ChaiWorld::chaiWorld.attachPolygons(*polygonCloth);
+    if(table)
+        ChaiWorld::chaiWorld.attachRigidObject(*table);
+    if(cloth)
+        ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
+    if(cloth2)
+        ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
+    if(polygonCloth)
+        ChaiWorld::chaiWorld.attachPolygons(*polygonCloth);
 
 
     //--------------------------------------------------------------------------
@@ -437,8 +441,8 @@ void updateGraphics(void)
     // render world
     ChaiWorld::chaiWorld.getCamera()->renderView(windowWidth, windowHeight);
 
-    ChaiWorld::chaiWorld.updateCloth(polygonCloth);
-
+    if(polygonCloth)
+        ChaiWorld::chaiWorld.updateCloth(polygonCloth);
 
     // wait until all GL commands are completed
     glFinish();
@@ -468,11 +472,10 @@ void updateHaptics(void)
         double time = chai3d::cMin(0.001, clock.stop());
 
         // restart clock
-        //clock.start(true);
+        clock.start(true);
 
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);             // one texture
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);   // two texture comparison
-        //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, nullptr, polygonCloth);     // one texture with polygon
 
         ChaiWorld::chaiWorld.updateHapticsMulti(time, table, cloth, polygonCloth);
 
