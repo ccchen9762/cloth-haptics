@@ -3,7 +3,8 @@
 #include "ChaiWorld.h"
 
 Deformable::Deformable(int width, int length, chai3d::cVector3d offset,
-	double elongation, double flexion, double torsion) :
+	double elongation, double flexion, double torsion,
+    double c11, double c12, double c22, double c33) :
 		m_width(width), m_length(length), m_offset(offset),
 		m_elongation(elongation), m_flexion(flexion), m_torsion(torsion),
 		m_stiffness(100), m_modelRadius(0.0f), m_staticFriction(0.3), m_dynamicFriction(0.2),
