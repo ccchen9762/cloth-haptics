@@ -211,11 +211,10 @@ int main(int argc, char* argv[])
     polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
 
-    ChaiWorld::chaiWorld.attachRigidObject(*table);
-    ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
-    //ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
-    ChaiWorld::chaiWorld.attachPolygons(*polygonCloth);
-
+    table->AttachToWorld(ChaiWorld::chaiWorld);
+    cloth->AttachToWorld(ChaiWorld::chaiWorld);
+    //cloth2->AttachToWorld(ChaiWorld::chaiWorld);
+    polygonCloth->AttachToWorld(ChaiWorld::chaiWorld);
 
     //--------------------------------------------------------------------------
     // WIDGETS

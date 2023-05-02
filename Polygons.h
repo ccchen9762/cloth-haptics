@@ -13,6 +13,8 @@ public:
 		double stiffness, double staticFriction, double dynamicFriction, double textureLevel);
 	~Polygons();
 
+	// setup object properties in world
+	void AttachToWorld(ChaiWorld& chaiWorld);
 	void updatePolygons();
 	void changeWireMode();
 

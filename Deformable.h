@@ -15,6 +15,9 @@ public:
 
 	cGELMesh* getDefObject() { return m_defObject; }
 
+	// setup object properties in world
+	void AttachToWorld(ChaiWorld& chaiWorld);
+
 private:
 	int m_width;
 	int m_length;
