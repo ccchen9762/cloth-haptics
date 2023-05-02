@@ -10,7 +10,8 @@ class Deformable
 
 public:
 	Deformable(int width, int length, chai3d::cVector3d offset, 
-		double elongation = 25.0, double flexion = 0.5, double torsion = 0.1);
+		double elongation = 25.0, double flexion = 0.5, double torsion = 0.1,
+    double c11 = 42.871021, double c12 = -0.234556, double c22 = 65.166023, double c33 = 83.175644);
 	~Deformable() = default;
 
 	cGELMesh* getDefObject() { return m_defObject; }
@@ -44,4 +45,10 @@ private:
 	// deformable friction test?
 	float m_staticFriction;
 	float m_dynamicFriction;
+  
+    // data driven elastic model
+	double m_c11;
+	double m_c12;
+	double m_c22;
+	double m_c33;
 };
