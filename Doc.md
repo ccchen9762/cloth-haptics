@@ -1,3 +1,5 @@
+https://hackmd.io/@yFRZf2itQymgxXtGGDUi8g/ByRzKlyVn
+
 * Structure:
     1. **main.cpp** -> main process, handle mouse and keyboard inputs, update graphics and physics.
     2. **ChaiWorld** class -> handles the initialization of world properties, include a singleton. **Use only this singleton**.
