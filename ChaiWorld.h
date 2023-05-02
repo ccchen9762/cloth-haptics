@@ -29,11 +29,8 @@ public:
 	double getDeviceForceScale() { return m_deviceForceScale; }
 	double getWorkspaceScaleFactor() { return m_workspaceScaleFactor; }
 	double getMaxStiffness() { return m_maxStiffness; }
+	double getMultiCursorRadius() { return m_multiCursorRadius; }
 	chai3d::cHapticDeviceInfo getHapticDeviceInfo() { return m_hapticDeviceInfo; }
-	
-	void attachDeformableObject(Deformable& deformable);
-	void attachRigidObject(Rigid& rigid);
-	void attachPolygons(Polygons& Polygons);
 
 	void cameraMoveForward();
 	void cameraMoveBack();
@@ -61,7 +58,6 @@ public:
 	static ChaiWorld chaiWorld;
 
 private:
-
 	// a world that contains all objects of the virtual environment
 	chai3d::cWorld* m_world;
 

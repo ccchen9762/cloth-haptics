@@ -210,16 +210,14 @@ int main(int argc, char* argv[])
     //polygon version
     //polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
-
     if(table)
-        ChaiWorld::chaiWorld.attachRigidObject(*table);
+        table->AttachToWorld(ChaiWorld::chaiWorld);
     if(cloth)
-        ChaiWorld::chaiWorld.attachDeformableObject(*cloth);
+        cloth->AttachToWorld(ChaiWorld::chaiWorld);
     if(cloth2)
-        ChaiWorld::chaiWorld.attachDeformableObject(*cloth2);
+        cloth2->AttachToWorld(ChaiWorld::chaiWorld);
     if(polygonCloth)
-        ChaiWorld::chaiWorld.attachPolygons(*polygonCloth);
-
+        polygonCloth->AttachToWorld(ChaiWorld::chaiWorld);
 
     //--------------------------------------------------------------------------
     // WIDGETS

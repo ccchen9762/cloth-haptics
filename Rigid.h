@@ -15,6 +15,9 @@ public:
 
 	chai3d::cVector3d getOffset() { return m_offset; }
 
+	// setup object properties in world
+	void AttachToWorld(ChaiWorld& chaiWorld);
+
 private:
 
 	chai3d::cMesh* m_object;
