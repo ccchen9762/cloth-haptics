@@ -223,14 +223,17 @@ void ChaiWorld::updateHapticsMulti(double time, Rigid* table, Deformable* cloth,
     // update cGELSkeletonLink elongation
     static double coeff = 0.0;
     coeff += 0.01;
+    // enable and assign table to this if you have a table
+    //std::vector<std::vector<double>> elongationTable((cloth->m_length - 1), std::vector<double>((cloth->m_width - 1) * 4, coeff));
+    
     std::list<cGELSkeletonLink*>::iterator it = cloth->m_defObject->m_links.begin();
-    std::vector<std::vector<double>> elongationTable((cloth->m_length - 1), std::vector<double>((cloth->m_width - 1) * 4, coeff));
     for (int i = 0; i < cloth->m_length - 1; i++)
     {
         for (int j = 0; j < cloth->m_width - 1; j++)
         {
             for (int k = 0; k < 4; k++) {
-                (*it)->m_kSpringElongation = elongationTable[i][j*4+k]; ++it;
+                //(*it)->m_kSpringElongation = elongationTable[i][j*4+k]; ++it;
+                (*it)->m_kSpringElongation = (j * j + 5) * 1; ++it;
             }
         }
     }

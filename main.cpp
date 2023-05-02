@@ -115,6 +115,7 @@ int main(int argc, char* argv[])
     std::cout << "[k] - Enable/Disable skeleton model" << std::endl;
     std::cout << "[l] - Enable/Disable polygon wire mode" << std::endl;
     std::cout << "[q] - Exit application" << std::endl;
+    std::cout << "[w,a,s,d] - move camera along xy plane" << std::endl;
     std::cout << std::endl << std::endl;
 
     // parse first arg to try and locate resources
@@ -202,7 +203,7 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     // COMPOSE THE VIRTUAL SCENE
     //-----------------------------------------------------------------------
-    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.5), 0.8, 0.3, 0.2, 1.0);
+    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -3.5), 0.8, 0.3, 0.2, 1.0);
     //texture 1
     cloth = new Deformable(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 10);
     //texture 2
@@ -474,7 +475,6 @@ void updateHaptics(void)
 
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table);             // one texture
         //ChaiWorld::chaiWorld.updateHaptics(time, cloth, table, cloth2);   // two texture comparison
-
         ChaiWorld::chaiWorld.updateHapticsMulti(time, table, cloth, polygonCloth);
 
         // signal frequency counter
