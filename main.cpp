@@ -203,13 +203,13 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------
     // COMPOSE THE VIRTUAL SCENE
     //-----------------------------------------------------------------------
-    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -3.5), 0.8, 0.3, 0.2, 1.0);
+    table = new Rigid(4.0, 4.0, chai3d::cVector3d(-0.5, 0.0, -0.5), 0.8, 0.3, 0.2, 1.0);
     //texture 1
     cloth = new Deformable(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 10);
     //texture 2
     //cloth2 = new Deformable(13, 13, chai3d::cVector3d(-0.5, 1.0, -0.1), 300);
     //polygon version
-    //polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
+    polygonCloth = new Polygons(14, 14, chai3d::cVector3d(-0.5, 0.0, -0.1), 0.8, 0.3, 0.2, 1.0);
 
     if(table)
         table->AttachToWorld(ChaiWorld::chaiWorld);
